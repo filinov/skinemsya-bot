@@ -1,0 +1,23 @@
+{
+  "name": "skinemsya-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  },
+  "dependencies": {
+    "@grammyjs/conversations": "^2.1.1",
+    "@grammyjs/storage-redis": "^2.5.1",
+    "dotenv": "^17.2.3",
+    "grammy": "^1.38.4",
+    "ioredis": "^5.8.2",
+    "mongoose": "^9.0.1",
+    "pino": "^10.1.0"
+  }
+}
