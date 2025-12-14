@@ -37,9 +37,9 @@ export const handleJoin = async (ctx, joinCode) => {
     return;
   }
 
-  await ensureParticipant(pool, user, { shareAmount: pool.shareAmount });
+  const updatedPool = await ensureParticipant(pool, user, { shareAmount: pool.shareAmount });
 
-  const { text, keyboard } = buildParticipantPoolView(pool);
+  const { text, keyboard } = buildParticipantPoolView(updatedPool);
 
   await ctx.reply(text, { reply_markup: keyboard, parse_mode: "HTML" });
 };
@@ -63,7 +63,7 @@ export const handlePay = async (ctx) => {
   }
 
   await ensureParticipant(pool, user, { shareAmount: pool.shareAmount });
-  const updated = await markParticipantPaid({ poolId, userId: user._id, payMethod: method });
+  const updated = await markParticipantPaid({ poolId, userId: user.id, payMethod: method });
 
   if (!updated) {
     await ctx.answerCallbackQuery({ text: "Не удалось отметить оплату", show_alert: true });
@@ -88,7 +88,7 @@ export const handlePay = async (ctx) => {
     const text = `💸 <b>${escapeHtml(displayName)}</b> сообщил о взносе в сбор <b>«${escapeHtml(
       updated.title
     )}»</b> (${methodText}). Подтверди взнос, когда получишь деньги.`;
-    const participant = updated.participants.find((p) => p.user && p.user._id.equals(user._id));
+    const participant = updated.participants.find((p) => p.userId === user.id);
     const keyboard =
       participant && participant.id
         ? new InlineKeyboard().text("Подтвердить взнос", `pamount:${updated.id}:${participant.id}:1:c`)

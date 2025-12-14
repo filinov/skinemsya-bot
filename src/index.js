@@ -1,6 +1,6 @@
 import { Bot, GrammyError, HttpError } from "grammy";
 import { conversations, createConversation } from "@grammyjs/conversations";
-import { connectToMongoDB, disconnectFromMongoDB } from "./config/mongo.js";
+import { connectToDatabase, disconnectFromDatabase } from "./config/prisma.js";
 import setupSession from "./middlewares/session.js";
 import logger from "./utils/logger.js";
 import env from "./config/env.js";
@@ -124,7 +124,7 @@ const startWebhook = async (bot) => {
   const gracefulShutdown = () => {
     logger.info("Received shutdown signal, closing webhook server...");
     webhookServer.close(async () => {
-      await disconnectFromMongoDB();
+      await disconnectFromDatabase();
       logger.info("Webhook server closed");
       process.exit(0);
     });
@@ -154,7 +154,7 @@ const bootstrap = async () => {
   try {
     logger.info(`🚀 Starting bot in ${env.nodeEnv} mode`);
 
-    await connectToMongoDB();
+    await connectToDatabase();
 
     const bot = createBot();
 
@@ -172,7 +172,7 @@ const bootstrap = async () => {
         
         try {
           bot.stop();
-          await disconnectFromMongoDB();
+          await disconnectFromDatabase();
           logger.info("Bot stopped gracefully");
           process.exit(0);
         } catch (error) {
@@ -197,9 +197,9 @@ const bootstrap = async () => {
     logger.error({ error }, "❌ Fatal error during bootstrap");
 
     try {
-      await disconnectFromMongoDB();
-    } catch (error) {
-      logger.error({ error: disconnectError }, "Failed to disconnect from MongoDB");
+      await disconnectFromDatabase();
+    } catch (disconnectError) {
+      logger.error({ error: disconnectError }, "Failed to disconnect from database");
     }
 
     process.exit(1);

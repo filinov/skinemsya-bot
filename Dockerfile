@@ -11,11 +11,14 @@ ENV NODE_ENV=production
 RUN addgroup -g 1001 -S nodejs && \
     adduser -u 1001 -S bot -G nodejs
 
-# Копирование файлов package.json и package-lock.json
+# Копирование файлов package.json и схемы Prisma
 COPY --chown=bot:nodejs package*.json ./
+COPY --chown=bot:nodejs prisma ./prisma
 
 # Установка зависимостей
-RUN npm ci --omit=dev --ignore-scripts && \
+RUN npm ci && \
+    npm run prisma -- generate && \
+    npm prune --omit=dev && \
     npm cache clean --force
 
 # Копирование исходного кода приложения

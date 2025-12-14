@@ -76,11 +76,11 @@ const askParticipants = async (conversation, ctx, knownParticipants, owner) => {
     return [];
   }
 
-  const ownerId = owner?._id?.toString();
+  const ownerId = owner?.id;
   const list = knownParticipants
     .map((user, idx) => {
       const baseName = getDisplayName(user);
-      const isOwner = ownerId && user._id?.toString?.() === ownerId;
+      const isOwner = ownerId && user.id === ownerId;
       const nameWithTag = isOwner ? `${baseName} (вы)` : baseName;
       return `${idx + 1}. ${nameWithTag}${user.username && !isOwner ? ` (@${user.username})` : ""}`;
     })
@@ -160,7 +160,7 @@ export const createPoolConversation = async (conversation, ctx) => {
   const amountType = await askAmountType(conversation, ctx);
   const amountValue = await askAmountValue(conversation, ctx, amountType);
   const paymentDetails = await askPaymentDetails(conversation, ctx);
-  const knownParticipants = await getKnownParticipants(owner._id);
+  const knownParticipants = await getKnownParticipants(owner.id);
   const selectedParticipants = await askParticipants(conversation, ctx, knownParticipants, owner);
   const expectedParticipantsCount =
     amountType === "total" && selectedParticipants.length === 0
@@ -185,8 +185,8 @@ export const createPoolConversation = async (conversation, ctx) => {
     return;
   }
 
-  const pool = await createPool({
-    ownerId: owner._id,
+  let pool = await createPool({
+    ownerId: owner.id,
     title,
     amountType,
     totalAmount: amountType === "total" ? amountValue : undefined,
@@ -203,14 +203,14 @@ export const createPoolConversation = async (conversation, ctx) => {
       pool.amountType === "per_person"
         ? pool.perPersonAmount
         : pool.shareAmount ?? Math.ceil((pool.totalAmount ?? 0) / Math.max(1, pool.expectedParticipantsCount));
-    const ownerId = owner._id?.toString?.();
+    const ownerId = owner.id;
 
     for (const user of selectedParticipants) {
-      const participantId = user?._id?.toString?.();
+      const participantId = user?.id;
       const isOwner = ownerId && participantId === ownerId;
       if (!user.telegramId && !isOwner) continue;
       try {
-        await ensureParticipant(pool, user, { shareAmount });
+        pool = await ensureParticipant(pool, user, { shareAmount });
         if (isOwner || !user.telegramId) continue;
         const participantView = buildParticipantPoolView(pool);
         await ctx.api.sendMessage(user.telegramId, participantView.text, {
@@ -219,7 +219,7 @@ export const createPoolConversation = async (conversation, ctx) => {
         });
       } catch (error) {
         logger.warn(
-          { error, participantId: user._id?.toString?.(), isOwner },
+          { error, participantId: user?.id, isOwner },
           "Failed to notify selected participant"
         );
       }

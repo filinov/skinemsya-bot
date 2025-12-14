@@ -1,4 +1,4 @@
-import User from "../models/User.js";
+import prisma from "../config/prisma.js";
 
 const buildDisplayName = (from) => {
   const nameParts = [from.first_name, from.last_name].filter(Boolean);
@@ -11,11 +11,13 @@ const buildDisplayName = (from) => {
   return `Без имени (${from.id})`;
 };
 
+const toTelegramId = (value) => (value == null ? null : String(value));
+
 export const upsertUserFromTelegram = async (from) => {
   if (!from) return null;
 
   const update = {
-    telegramId: from.id,
+    telegramId: toTelegramId(from.id),
     username: from.username,
     firstName: from.first_name,
     lastName: from.last_name,
@@ -23,11 +25,11 @@ export const upsertUserFromTelegram = async (from) => {
     lastSeenAt: new Date()
   };
 
-  const user = await User.findOneAndUpdate(
-    { telegramId: from.id },
-    { $set: update },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  const user = await prisma.user.upsert({
+    where: { telegramId: update.telegramId },
+    update,
+    create: update
+  });
 
   return { user, displayName: buildDisplayName(from) };
 };
@@ -44,7 +46,8 @@ export const getDisplayName = (user) => {
   return `Участник ${user.telegramId}`;
 };
 
-export const findUserByTelegramId = (telegramId) => User.findOne({ telegramId });
+export const findUserByTelegramId = (telegramId) =>
+  prisma.user.findUnique({ where: { telegramId: toTelegramId(telegramId) } });
 
 export const touchUsers = async (fromArray = []) => {
   const promises = fromArray.map((from) => upsertUserFromTelegram(from));

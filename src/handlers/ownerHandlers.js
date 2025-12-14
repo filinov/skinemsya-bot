@@ -32,13 +32,13 @@ const compactPaymentMode = (mode) => {
 };
 
 const findOwnerParticipant = (pool, owner) => {
-  if (!owner) return null;
-  const ownerId = owner._id?.toString();
-  return pool.participants.find((p) => {
-    const pid = p.user?._id?.toString?.() ?? p.user?.toString?.();
-    return pid === ownerId;
-  });
+  const ownerId = owner?.id;
+  if (!ownerId) return null;
+  return pool.participants.find((p) => p.userId === ownerId);
 };
+
+const findParticipantById = (pool, participantId) =>
+  pool.participants.find((participant) => participant.id === participantId);
 
 const buildOwnerKeyboard = (pool) => {
   const keyboard = new InlineKeyboard();
@@ -171,14 +171,14 @@ export const sendOwnerPools = async (ctx, page = 1) => {
     return;
   }
 
-  let { items: pools, total, limit, page: currentPage } = await getPoolsByOwner(owner._id, {
+  let { items: pools, total, limit, page: currentPage } = await getPoolsByOwner(owner.id, {
     limit: POOLS_PAGE_SIZE,
     page
   });
   let totalPages = Math.max(1, Math.ceil(total / limit));
 
   if (total > 0 && pools.length === 0 && currentPage > totalPages) {
-    ({ items: pools, total, limit, page: currentPage } = await getPoolsByOwner(owner._id, {
+    ({ items: pools, total, limit, page: currentPage } = await getPoolsByOwner(owner.id, {
       limit: POOLS_PAGE_SIZE,
       page: totalPages
     }));
@@ -233,7 +233,7 @@ export const sendOwnerPool = async (ctx) => {
     return;
   }
 
-  const pool = await getPoolByIdForOwner(poolId, owner._id);
+  const pool = await getPoolByIdForOwner(poolId, owner.id);
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
     return;
@@ -253,7 +253,7 @@ export const sendPaymentMenu = async (ctx) => {
     return;
   }
 
-  const pool = await getPoolByIdForOwner(poolId, owner._id);
+  const pool = await getPoolByIdForOwner(poolId, owner.id);
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
     return;
@@ -291,7 +291,7 @@ export const askPaymentAmount = async (ctx) => {
     return;
   }
 
-  const pool = await getPoolByIdForOwner(poolId, owner._id);
+  const pool = await getPoolByIdForOwner(poolId, owner.id);
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
     return;
@@ -301,7 +301,7 @@ export const askPaymentAmount = async (ctx) => {
     return;
   }
 
-  const participant = pool.participants.id(participantId);
+  const participant = findParticipantById(pool, participantId);
   if (!participant) {
     await ctx.answerCallbackQuery({ text: "Участник не найден", show_alert: true });
     await renderPaymentMenu(ctx, pool, Number(pageRaw ?? 1), owner);
@@ -323,9 +323,9 @@ const applyOwnerAmountUpdate = async ({ ctx, poolId, participantId, owner, amoun
   const normalizedMode = normalizePaymentMode(mode);
   let updatedPool = null;
   if (normalizedMode === "confirm") {
-    updatedPool = await confirmParticipantPayment({ poolId, participantId, ownerId: owner._id, amount });
+    updatedPool = await confirmParticipantPayment({ poolId, participantId, ownerId: owner.id, amount });
   } else if (normalizedMode === "manual") {
-    updatedPool = await manualConfirmParticipantPayment({ poolId, participantId, ownerId: owner._id, amount });
+    updatedPool = await manualConfirmParticipantPayment({ poolId, participantId, ownerId: owner.id, amount });
   } else if (normalizedMode === "self") {
     updatedPool = await markOwnerSelfPayment({ poolId, owner, amount });
   }
@@ -338,7 +338,7 @@ const applyOwnerAmountUpdate = async ({ ctx, poolId, participantId, owner, amoun
 };
 
 const notifyPaymentConfirmed = async ({ ctx, pool, participantId, owner }) => {
-  const participant = pool.participants.id(participantId);
+  const participant = findParticipantById(pool, participantId);
   if (participant?.user?.telegramId && participant.user.telegramId !== owner.telegramId) {
     const text = `✅ Организатор подтвердил твой взнос в сборе <b>«${escapeHtml(pool.title)}»</b>. Спасибо!`;
     await ctx.api.sendMessage(participant.user.telegramId, text, { parse_mode: "HTML" });
@@ -377,7 +377,7 @@ export const setFullPaymentAmount = async (ctx) => {
     return;
   }
 
-  const pool = await getPoolByIdForOwner(poolId, owner._id);
+  const pool = await getPoolByIdForOwner(poolId, owner.id);
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
     return;
@@ -387,7 +387,7 @@ export const setFullPaymentAmount = async (ctx) => {
     return;
   }
 
-  const participant = participantId ? pool.participants.id(participantId) : null;
+  const participant = participantId ? findParticipantById(pool, participantId) : null;
   const expected = participant ? participantExpectedAmount(participant, pool) : pool.shareAmount ?? 0;
   const page = Number(pageRaw ?? 1);
   const target = extractTargetMessage(ctx);
@@ -419,7 +419,7 @@ export const requestCustomPaymentAmount = async (ctx) => {
     return;
   }
 
-  const pool = await getPoolByIdForOwner(poolId, owner._id);
+  const pool = await getPoolByIdForOwner(poolId, owner.id);
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
     return;
@@ -429,7 +429,7 @@ export const requestCustomPaymentAmount = async (ctx) => {
     return;
   }
 
-  const participant = pool.participants.id(participantId);
+  const participant = findParticipantById(pool, participantId);
   if (!participant) {
     await ctx.answerCallbackQuery({ text: "Участник не найден", show_alert: true });
     await renderPaymentMenu(ctx, pool, Number(pageRaw ?? 1), owner);
@@ -489,8 +489,8 @@ export const handlePaymentAmountInput = async (ctx, next) => {
     mode === "self"
       ? await markOwnerSelfPayment({ poolId, owner, amount: value })
       : mode === "confirm"
-        ? await confirmParticipantPayment({ poolId, participantId, ownerId: owner._id, amount: value })
-        : await manualConfirmParticipantPayment({ poolId, participantId, ownerId: owner._id, amount: value });
+        ? await confirmParticipantPayment({ poolId, participantId, ownerId: owner.id, amount: value })
+        : await manualConfirmParticipantPayment({ poolId, participantId, ownerId: owner.id, amount: value });
 
   if (!pool) {
     await ctx.reply("Не удалось отметить взнос.");
@@ -517,7 +517,7 @@ export const confirmPayment = async (ctx) => {
     return;
   }
 
-  const pool = await confirmParticipantPayment({ poolId, participantId, ownerId: owner._id });
+  const pool = await confirmParticipantPayment({ poolId, participantId, ownerId: owner.id });
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Не удалось подтвердить", show_alert: true });
     return;
@@ -531,7 +531,7 @@ export const confirmPayment = async (ctx) => {
 
   await renderOwnerPool(ctx, pool);
 
-  const participant = pool.participants.id(participantId);
+  const participant = findParticipantById(pool, participantId);
   if (participant?.user?.telegramId && participant.user.telegramId !== owner.telegramId) {
     await ctx.api.sendMessage(
       participant.user.telegramId,
@@ -548,7 +548,7 @@ export const manualConfirmPayment = async (ctx) => {
     return;
   }
 
-  const pool = await manualConfirmParticipantPayment({ poolId, participantId, ownerId: owner._id });
+  const pool = await manualConfirmParticipantPayment({ poolId, participantId, ownerId: owner.id });
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Не удалось отметить взнос", show_alert: true });
     return;
@@ -561,7 +561,7 @@ export const manualConfirmPayment = async (ctx) => {
   await ctx.answerCallbackQuery({ text: "Взнос отмечен" });
   await renderOwnerPool(ctx, pool);
 
-  const participant = pool.participants.id(participantId);
+  const participant = findParticipantById(pool, participantId);
   if (participant?.user?.telegramId && participant.user.telegramId !== owner.telegramId) {
     await ctx.api.sendMessage(
       participant.user.telegramId,
@@ -578,7 +578,7 @@ export const confirmPaymentFromMenu = async (ctx) => {
     return;
   }
 
-  const pool = await confirmParticipantPayment({ poolId, participantId, ownerId: owner._id });
+  const pool = await confirmParticipantPayment({ poolId, participantId, ownerId: owner.id });
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Не удалось подтвердить", show_alert: true });
     return;
@@ -592,7 +592,7 @@ export const confirmPaymentFromMenu = async (ctx) => {
   const page = Number(pageRaw ?? 1);
   await renderPaymentMenu(ctx, pool, page, owner);
 
-  const participant = pool.participants.id(participantId);
+  const participant = findParticipantById(pool, participantId);
   if (participant?.user?.telegramId && participant.user.telegramId !== owner.telegramId) {
     await ctx.api.sendMessage(
       participant.user.telegramId,
@@ -609,7 +609,7 @@ export const manualConfirmPaymentFromMenu = async (ctx) => {
     return;
   }
 
-  const pool = await manualConfirmParticipantPayment({ poolId, participantId, ownerId: owner._id });
+  const pool = await manualConfirmParticipantPayment({ poolId, participantId, ownerId: owner.id });
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Не удалось отметить взнос", show_alert: true });
     return;
@@ -623,7 +623,7 @@ export const manualConfirmPaymentFromMenu = async (ctx) => {
   const page = Number(pageRaw ?? 1);
   await renderPaymentMenu(ctx, pool, page, owner);
 
-  const participant = pool.participants.id(participantId);
+  const participant = findParticipantById(pool, participantId);
   if (participant?.user?.telegramId && participant.user.telegramId !== owner.telegramId) {
     await ctx.api.sendMessage(
       participant.user.telegramId,
@@ -640,7 +640,7 @@ export const selfConfirmPayment = async (ctx) => {
     return;
   }
 
-  const current = await getPoolByIdForOwner(poolId, owner._id);
+  const current = await getPoolByIdForOwner(poolId, owner.id);
   if (!current) {
     await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
     return;
@@ -669,7 +669,7 @@ export const closePool = async (ctx) => {
     return;
   }
 
-  const current = await getPoolByIdForOwner(poolId, owner._id);
+  const current = await getPoolByIdForOwner(poolId, owner.id);
   if (!current) {
     await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
     return;
@@ -681,7 +681,7 @@ export const closePool = async (ctx) => {
     return;
   }
 
-  const pool = await setPoolClosed({ poolId, ownerId: owner._id, isClosed: true });
+  const pool = await setPoolClosed({ poolId, ownerId: owner.id, isClosed: true });
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Не удалось закрыть", show_alert: true });
     return;
@@ -701,7 +701,7 @@ export const openPool = async (ctx) => {
     return;
   }
 
-  const pool = await setPoolClosed({ poolId, ownerId: owner._id, isClosed: false });
+  const pool = await setPoolClosed({ poolId, ownerId: owner.id, isClosed: false });
   if (!pool) {
     await ctx.answerCallbackQuery({ text: "Не удалось открыть", show_alert: true });
     return;

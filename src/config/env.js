@@ -28,7 +28,7 @@ const env = {
   botToken: process.env.BOT_TOKEN,
 
   // База данных
-  mongodbUri: process.env.MONGODB_URI || (isProduction ? null : "mongodb://localhost:27017/skinemsya-bot"),
+  databaseUrl: process.env.DATABASE_URL || (isProduction ? null : "file:./data/bot.db"),
 
   // Логирование
   logLevel: process.env.LOG_LEVEL || (isProduction ? "info" : "debug"),
@@ -55,8 +55,8 @@ if (!env.botToken) {
   errors.push("BOT_TOKEN обязателен для запуска бота");
 }
 
-if (!env.mongodbUri) {
-  errors.push("MONGODB_URI обязателен для подключения к базе данных");
+if (!env.databaseUrl) {
+  errors.push("DATABASE_URL обязателен для подключения к базе данных");
 }
 
 if (isProduction && env.enableWebhook && !env.webhookDomain) {

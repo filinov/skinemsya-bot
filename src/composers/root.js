@@ -56,19 +56,20 @@ composer.callbackQuery("action:menu", async (ctx) => {
 
 composer.callbackQuery("noop", (ctx) => ctx.answerCallbackQuery());
 
-composer.callbackQuery(/^pay:([a-f0-9]{24}):(transfer|cash)$/, handlePay);
-composer.callbackQuery(/^pool:([a-f0-9]{24})$/, sendOwnerPool);
-composer.callbackQuery(/^confirm:([a-f0-9]{24}):([a-f0-9]{24})$/, confirmPayment);
-composer.callbackQuery(/^manual:([a-f0-9]{24}):([a-f0-9]{24})$/, manualConfirmPayment);
-composer.callbackQuery(/^close:([a-f0-9]{24})$/, closePool);
-composer.callbackQuery(/^open:([a-f0-9]{24})$/, openPool);
-composer.callbackQuery(/^pmenu:([a-f0-9]{24}):(\d+)$/, sendPaymentMenu);
-composer.callbackQuery(/^pmc:([a-f0-9]{24}):([a-f0-9]{24}):(\d+)$/, confirmPaymentFromMenu);
-composer.callbackQuery(/^pmm:([a-f0-9]{24}):([a-f0-9]{24}):(\d+)$/, manualConfirmPaymentFromMenu);
-composer.callbackQuery(/^selfpay:([a-f0-9]{24}):(\d+)$/, selfConfirmPayment);
-composer.callbackQuery(/^pamount:([a-f0-9]{24}):([a-f0-9]{24}):(\d+):(confirm|manual|c|m)$/, askPaymentAmount);
-composer.callbackQuery(/^pafull:([a-f0-9]{24}):([a-f0-9]{24}):(\d+):(confirm|manual|c|m)$/, setFullPaymentAmount);
-composer.callbackQuery(/^pacustom:([a-f0-9]{24}):([a-f0-9]{24}):(\d+):(confirm|manual|c|m)$/, requestCustomPaymentAmount);
+const poolIdPattern = "([a-zA-Z0-9_-]+)";
+composer.callbackQuery(new RegExp(`^pay:${poolIdPattern}:(transfer|cash)$`), handlePay);
+composer.callbackQuery(new RegExp(`^pool:${poolIdPattern}$`), sendOwnerPool);
+composer.callbackQuery(new RegExp(`^confirm:${poolIdPattern}:${poolIdPattern}$`), confirmPayment);
+composer.callbackQuery(new RegExp(`^manual:${poolIdPattern}:${poolIdPattern}$`), manualConfirmPayment);
+composer.callbackQuery(new RegExp(`^close:${poolIdPattern}$`), closePool);
+composer.callbackQuery(new RegExp(`^open:${poolIdPattern}$`), openPool);
+composer.callbackQuery(new RegExp(`^pmenu:${poolIdPattern}:(\\d+)$`), sendPaymentMenu);
+composer.callbackQuery(new RegExp(`^pmc:${poolIdPattern}:${poolIdPattern}:(\\d+)$`), confirmPaymentFromMenu);
+composer.callbackQuery(new RegExp(`^pmm:${poolIdPattern}:${poolIdPattern}:(\\d+)$`), manualConfirmPaymentFromMenu);
+composer.callbackQuery(new RegExp(`^selfpay:${poolIdPattern}:(\\d+)$`), selfConfirmPayment);
+composer.callbackQuery(new RegExp(`^pamount:${poolIdPattern}:${poolIdPattern}:(\\d+):(confirm|manual|c|m)$`), askPaymentAmount);
+composer.callbackQuery(new RegExp(`^pafull:${poolIdPattern}:${poolIdPattern}:(\\d+):(confirm|manual|c|m)$`), setFullPaymentAmount);
+composer.callbackQuery(new RegExp(`^pacustom:${poolIdPattern}:${poolIdPattern}:(\\d+):(confirm|manual|c|m)$`), requestCustomPaymentAmount);
 composer.on("message:text", handlePaymentAmountInput);
 
 export default composer;

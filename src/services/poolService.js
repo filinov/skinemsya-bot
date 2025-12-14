@@ -1,6 +1,17 @@
 import crypto from "crypto";
-import Pool from "../models/Pool.js";
+import prisma from "../config/prisma.js";
 import { getDisplayName } from "./userService.js";
+
+const poolInclude = {
+  owner: true,
+  participants: {
+    include: {
+      user: true
+    }
+  }
+};
+
+const reloadPool = (poolId) => prisma.pool.findUnique({ where: { id: poolId }, include: poolInclude });
 
 export const generateJoinCode = () => crypto.randomBytes(6).toString("hex");
 
@@ -29,7 +40,7 @@ export const createPool = async ({
   });
 
   const participantsData = participants.map((user) => ({
-    user: user._id,
+    user: { connect: { id: user.id } },
     displayName: getDisplayName(user),
     expectedAmount: shareAmount,
     status: "invited"
@@ -37,173 +48,211 @@ export const createPool = async ({
 
   const joinCode = generateJoinCode();
 
-  const pool = await Pool.create({
-    owner: ownerId,
-    title,
-    amountType,
-    totalAmount: amountType === "total" ? totalAmount : undefined,
-    perPersonAmount: amountType === "per_person" ? perPersonAmount : undefined,
-    paymentDetails,
-    shareAmount,
-    expectedParticipantsCount: participantCount,
-    participants: participantsData,
-    joinCode
+  const pool = await prisma.pool.create({
+    data: {
+      owner: { connect: { id: ownerId } },
+      title,
+      amountType,
+      totalAmount: amountType === "total" ? totalAmount ?? 0 : null,
+      perPersonAmount: amountType === "per_person" ? perPersonAmount ?? 0 : null,
+      paymentDetails,
+      shareAmount,
+      expectedParticipantsCount: participantCount,
+      participants: { create: participantsData },
+      joinCode
+    },
+    include: poolInclude
   });
 
   return pool;
 };
 
 export const getPoolByJoinCode = (joinCode) =>
-  Pool.findOne({ joinCode, isClosed: false }).populate("owner").populate("participants.user");
+  prisma.pool.findFirst({ where: { joinCode, isClosed: false }, include: poolInclude });
 
 export const getPoolsByOwner = async (ownerId, { limit = 10, page = 1 } = {}) => {
   const safeLimit = Math.max(1, Math.min(limit, 50));
   const safePage = Math.max(1, page);
   const [items, total] = await Promise.all([
-    Pool.find({ owner: ownerId })
-      .sort({ createdAt: -1 })
-      .skip((safePage - 1) * safeLimit)
-      .limit(safeLimit)
-      .populate("participants.user"),
-    Pool.countDocuments({ owner: ownerId })
+    prisma.pool.findMany({
+      where: { ownerId },
+      orderBy: { createdAt: "desc" },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit
+    }),
+    prisma.pool.count({ where: { ownerId } })
   ]);
 
   return { items, total, page: safePage, limit: safeLimit };
 };
 
 export const getPoolByIdForOwner = (poolId, ownerId) =>
-  Pool.findOne({ _id: poolId, owner: ownerId }).populate("participants.user");
+  prisma.pool.findFirst({ where: { id: poolId, ownerId }, include: poolInclude });
 
-export const getPoolById = (poolId) => Pool.findById(poolId).populate("participants.user").populate("owner");
+export const getPoolById = (poolId) => prisma.pool.findUnique({ where: { id: poolId }, include: poolInclude });
 
 export const ensureParticipant = async (pool, user, opts = {}) => {
   const displayName = getDisplayName(user);
-  const participant = pool.participants.find((p) => p.user && p.user.equals(user._id));
+  const existing = await prisma.poolParticipant.findFirst({
+    where: { poolId: pool.id, userId: user.id }
+  });
 
-  if (participant) {
-    if (!participant.joinedAt) participant.joinedAt = new Date();
-    participant.status = participant.status === "confirmed" ? "confirmed" : "joined";
-  } else {
-    pool.participants.push({
-      user: user._id,
-      displayName,
-      status: "joined",
-      joinedAt: new Date(),
-      expectedAmount: opts.shareAmount ?? pool.shareAmount ?? 0,
-      payMethod: "unknown"
+  if (existing) {
+    await prisma.poolParticipant.update({
+      where: { id: existing.id },
+      data: {
+        joinedAt: existing.joinedAt ?? new Date(),
+        status: existing.status === "confirmed" ? "confirmed" : "joined"
+      }
     });
+    return reloadPool(pool.id);
   }
 
-  await pool.save();
-  await pool.populate("participants.user");
+  await prisma.pool.update({
+    where: { id: pool.id },
+    data: {
+      participants: {
+        create: {
+          user: { connect: { id: user.id } },
+          displayName,
+          status: "joined",
+          joinedAt: new Date(),
+          expectedAmount: opts.shareAmount ?? pool.shareAmount ?? 0,
+          payMethod: "unknown"
+        }
+      }
+    }
+  });
 
-  return pool;
+  return reloadPool(pool.id);
 };
 
 export const markParticipantPaid = async ({ poolId, userId, payMethod = "transfer", note }) => {
-  const pool = await Pool.findById(poolId).populate("participants.user").populate("owner");
+  const pool = await getPoolById(poolId);
   if (!pool) return null;
 
-  const participant = pool.participants.find((p) => p.user && p.user._id.equals(userId));
+  const participant = pool.participants.find((p) => p.userId === userId);
   if (!participant) return null;
-
   if (participant.status === "confirmed") return pool;
 
-  participant.status = "marked_paid";
-  participant.paidAmount = participant.expectedAmount ?? pool.shareAmount ?? 0;
-  participant.payMethod = payMethod;
-  participant.note = note;
-  participant.markedAt = new Date();
+  const paidAmount = participant.expectedAmount ?? pool.shareAmount ?? 0;
 
-  await pool.save();
-  await pool.populate("participants.user");
-  return pool;
+  await prisma.poolParticipant.update({
+    where: { id: participant.id },
+    data: {
+      status: "marked_paid",
+      paidAmount,
+      payMethod,
+      note,
+      markedAt: new Date()
+    }
+  });
+
+  return reloadPool(pool.id);
 };
 
 export const confirmParticipantPayment = async ({ poolId, participantId, ownerId, amount }) => {
-  const pool = await Pool.findOne({ _id: poolId, owner: ownerId }).populate("participants.user");
+  const pool = await getPoolByIdForOwner(poolId, ownerId);
   if (!pool) return null;
 
-  const participant = pool.participants.id(participantId);
+  const participant = pool.participants.find((p) => p.id === participantId);
   if (!participant) return null;
 
-  participant.status = "confirmed";
   const paid = amount ?? participant.paidAmount ?? participant.expectedAmount ?? pool.shareAmount ?? 0;
-  participant.paidAmount = paid;
-  participant.confirmedAt = new Date();
 
-  await pool.save();
-  await pool.populate("participants.user");
-  return pool;
+  await prisma.poolParticipant.update({
+    where: { id: participant.id },
+    data: {
+      status: "confirmed",
+      paidAmount: paid,
+      confirmedAt: new Date()
+    }
+  });
+
+  return reloadPool(pool.id);
 };
 
 export const manualConfirmParticipantPayment = async ({ poolId, participantId, ownerId, amount }) => {
-  const pool = await Pool.findOne({ _id: poolId, owner: ownerId }).populate("participants.user");
+  const pool = await getPoolByIdForOwner(poolId, ownerId);
   if (!pool) return null;
 
-  const participant = pool.participants.id(participantId);
+  const participant = pool.participants.find((p) => p.id === participantId);
   if (!participant) return null;
 
-  participant.status = "confirmed";
   const paid = amount ?? participant.paidAmount ?? participant.expectedAmount ?? pool.shareAmount ?? 0;
-  participant.paidAmount = paid;
-  participant.joinedAt = participant.joinedAt ?? new Date();
-  participant.markedAt = participant.markedAt ?? new Date();
-  participant.confirmedAt = new Date();
-  participant.payMethod = participant.payMethod || "unknown";
 
-  await pool.save();
-  await pool.populate("participants.user");
-  return pool;
+  await prisma.poolParticipant.update({
+    where: { id: participant.id },
+    data: {
+      status: "confirmed",
+      paidAmount: paid,
+      joinedAt: participant.joinedAt ?? new Date(),
+      markedAt: participant.markedAt ?? new Date(),
+      confirmedAt: new Date(),
+      payMethod: participant.payMethod || "unknown"
+    }
+  });
+
+  return reloadPool(pool.id);
 };
 
 export const markOwnerSelfPayment = async ({ poolId, owner, amount }) => {
-  const pool = await Pool.findOne({ _id: poolId, owner: owner._id }).populate("participants.user").populate("owner");
+  const pool = await getPoolByIdForOwner(poolId, owner.id);
   if (!pool) return null;
 
   const expectedAmount = pool.shareAmount ?? pool.perPersonAmount ?? pool.totalAmount ?? 0;
-  const ownerId = owner._id?.toString();
-  let participant = pool.participants.find((p) => {
-    const id = p.user?._id?.toString?.() ?? p.user?.toString?.();
-    return id === ownerId;
-  });
+  const ownerParticipant = pool.participants.find((p) => p.userId === owner.id);
 
-  if (!participant) {
-    participant = pool.participants.create({
-      user: owner._id,
-      displayName: getDisplayName(owner),
-      status: "confirmed",
-      expectedAmount,
-      paidAmount: amount ?? expectedAmount,
-      payMethod: "unknown",
-      joinedAt: new Date(),
-      markedAt: new Date(),
-      confirmedAt: new Date()
+  if (ownerParticipant) {
+    await prisma.poolParticipant.update({
+      where: { id: ownerParticipant.id },
+      data: {
+        status: "confirmed",
+        expectedAmount: ownerParticipant.expectedAmount ?? expectedAmount,
+        paidAmount: amount ?? ownerParticipant.paidAmount ?? ownerParticipant.expectedAmount ?? expectedAmount,
+        joinedAt: ownerParticipant.joinedAt ?? new Date(),
+        markedAt: ownerParticipant.markedAt ?? new Date(),
+        confirmedAt: new Date(),
+        payMethod: ownerParticipant.payMethod || "unknown"
+      }
     });
-    pool.participants.push(participant);
   } else {
-    participant.status = "confirmed";
-    participant.expectedAmount = participant.expectedAmount ?? expectedAmount;
-    participant.paidAmount = amount ?? participant.paidAmount ?? participant.expectedAmount ?? expectedAmount;
-    participant.joinedAt = participant.joinedAt ?? new Date();
-    participant.markedAt = participant.markedAt ?? new Date();
-    participant.confirmedAt = new Date();
-    participant.payMethod = participant.payMethod || "unknown";
+    await prisma.poolParticipant.create({
+      data: {
+        pool: { connect: { id: pool.id } },
+        user: { connect: { id: owner.id } },
+        displayName: getDisplayName(owner),
+        status: "confirmed",
+        expectedAmount,
+        paidAmount: amount ?? expectedAmount,
+        payMethod: "unknown",
+        joinedAt: new Date(),
+        markedAt: new Date(),
+        confirmedAt: new Date()
+      }
+    });
   }
 
-  await pool.save();
-  await pool.populate("participants.user");
-  return pool;
+  return reloadPool(pool.id);
 };
 
 export const getKnownParticipants = async (ownerId) => {
-  const pools = await Pool.find({ owner: ownerId }).populate("participants.user");
+  const pools = await prisma.pool.findMany({
+    where: { ownerId },
+    include: {
+      participants: {
+        where: { userId: { not: null } },
+        include: { user: true }
+      }
+    }
+  });
+
   const map = new Map();
 
   pools.forEach((pool) => {
     pool.participants.forEach((participant) => {
       if (participant.user) {
-        map.set(participant.user._id.toString(), participant.user);
+        map.set(participant.user.id, participant.user);
       }
     });
   });
@@ -212,12 +261,13 @@ export const getKnownParticipants = async (ownerId) => {
 };
 
 export const setPoolClosed = async ({ poolId, ownerId, isClosed }) => {
-  const pool = await Pool.findOne({ _id: poolId, owner: ownerId }).populate("participants.user");
+  const pool = await getPoolByIdForOwner(poolId, ownerId);
   if (!pool) return null;
 
-  pool.isClosed = isClosed;
-  await pool.save();
-  await pool.populate("participants.user");
+  await prisma.pool.update({
+    where: { id: pool.id },
+    data: { isClosed }
+  });
 
-  return pool;
+  return reloadPool(pool.id);
 };

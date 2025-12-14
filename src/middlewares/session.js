@@ -1,36 +1,38 @@
 import { session } from "grammy";
-import SessionModel from "../models/Session.js";
+import prisma from "../config/prisma.js";
 import logger from "../utils/logger.js";
 
-class MongoSessionStorage {
+class PrismaSessionStorage {
   async read(key) {
     try {
-      const record = await SessionModel.findOne({ key }).lean();
+      const record = await prisma.session.findUnique({ where: { key } });
       return record?.data;
     } catch (error) {
-      logger.error({ err: error, key }, "Failed to read session from MongoDB");
+      logger.error({ err: error, key }, "Failed to read session from database");
       throw error;
     }
   }
 
   async write(key, value) {
     try {
-      await SessionModel.findOneAndUpdate(
-        { key },
-        { data: value },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
+      await prisma.session.upsert({
+        where: { key },
+        update: { data: value, updatedAt: new Date() },
+        create: { key, data: value }
+      });
     } catch (error) {
-      logger.error({ err: error, key }, "Failed to write session to MongoDB");
+      logger.error({ err: error, key }, "Failed to write session to database");
       throw error;
     }
   }
 
   async delete(key) {
     try {
-      await SessionModel.deleteOne({ key });
+      await prisma.session.delete({ where: { key } });
     } catch (error) {
-      logger.error({ err: error, key }, "Failed to delete session from MongoDB");
+      // Ignore "record not found"
+      if (error.code === "P2025") return;
+      logger.error({ err: error, key }, "Failed to delete session from database");
       throw error;
     }
   }
@@ -39,6 +41,6 @@ class MongoSessionStorage {
 export default () =>
   session({
     initial: () => ({}),
-    storage: new MongoSessionStorage(),
+    storage: new PrismaSessionStorage(),
     getSessionKey: (ctx) => (ctx.from ? String(ctx.from.id) : undefined)
   });
