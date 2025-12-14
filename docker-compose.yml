@@ -1,11 +1,25 @@
 services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: skinemsya-bot
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - app-network
+
   mongo:
     image: mongo:7
     container_name: mongo-db
     restart: unless-stopped
     ports:
       # В продакшене лучше не открывать порт наружу
-      # - '27017:27017' # Закомментировать для продакшена
+      - '27017:27017' # Закомментировать для продакшена
     expose:
       - 27017
     volumes:
