@@ -7,11 +7,11 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - ENABLE_WEBHOOK=${ENABLE_WEBHOOK}
-      - BOT_TOKEN=${BOT_TOKEN}
-      - BOT_ADMIN_ID=${BOT_ADMIN_ID}
-      - WEBHOOK_DOMAIN=${WEBHOOK_DOMAIN}
-      - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DATABASE}
+      # - ENABLE_WEBHOOK=${ENABLE_WEBHOOK}
+      # - BOT_TOKEN=${BOT_TOKEN}
+      # - BOT_ADMIN_ID=${BOT_ADMIN_ID}
+      # - WEBHOOK_DOMAIN=${WEBHOOK_DOMAIN}
+      # - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DATABASE}
     ports:
       - '3000:3000'
     depends_on:
@@ -25,9 +25,9 @@ services:
     container_name: mongo-db
     restart: unless-stopped
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
-      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
+      # - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      # - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+      # - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
     ports:
       []
       # В продакшене лучше не открывать порт наружу
