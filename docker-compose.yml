@@ -7,10 +7,10 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - ENABLE_WEBHOOK=true
+      - ENABLE_WEBHOOK=${ENABLE_WEBHOOK}
       - BOT_TOKEN=${BOT_TOKEN}
       - BOT_ADMIN_ID=${BOT_ADMIN_ID}
       - WEBHOOK_DOMAIN=${WEBHOOK_DOMAIN}
-      - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@192.168.0.4:27017/skinemsya_db?authSource=admin&directConnection=true
+      - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@192.168.0.5:27017/${MONGO_DATABASE}?authSource=admin&directConnection=true
     ports:
       - '3000:3000'
