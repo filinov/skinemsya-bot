@@ -10,6 +10,8 @@ npm-debug.log
 logs
 *.log
 
+*.db
+
 docker-compose.yml
 Dockerfile*
 .dockerignore

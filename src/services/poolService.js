@@ -117,6 +117,51 @@ export const getPoolByIdForOwner = (poolId, ownerId) => loadPool(and(eq(pools.id
 
 export const getPoolById = (poolId) => loadPool(eq(pools.id, poolId));
 
+const collectTopValues = (items = [], limit = 5) => {
+  const freq = new Map();
+  items.forEach((value, idx) => {
+    if (value === null || value === undefined) return;
+    const key = typeof value === "string" ? value.trim() : value;
+    if (key === "" || Number.isNaN(key)) return;
+    if (!freq.has(key)) {
+      freq.set(key, { value, count: 0, firstIndex: idx });
+    }
+    const entry = freq.get(key);
+    entry.count += 1;
+  });
+
+  return Array.from(freq.values())
+    .sort((a, b) => b.count - a.count || a.firstIndex - b.firstIndex)
+    .slice(0, limit)
+    .map((entry) => entry.value);
+};
+
+export const getOwnerPoolHints = (ownerId, { limit = 5 } = {}) => {
+  const db = getDb();
+  const rows = db
+    .select()
+    .from(pools)
+    .where(eq(pools.ownerId, ownerId))
+    .orderBy(desc(pools.createdAt))
+    .limit(50)
+    .all();
+
+  const totalAmounts = collectTopValues(
+    rows.filter((p) => p.amountType === "total" && p.totalAmount > 0).map((p) => p.totalAmount),
+    limit
+  );
+  const perPersonAmounts = collectTopValues(
+    rows.filter((p) => p.amountType === "per_person" && p.perPersonAmount > 0).map((p) => p.perPersonAmount),
+    limit
+  );
+  const paymentDetails = collectTopValues(
+    rows.map((p) => p.paymentDetails).filter(Boolean),
+    limit
+  );
+
+  return { totalAmounts, perPersonAmounts, paymentDetails };
+};
+
 export const ensureParticipant = async (pool, user, opts = {}) => {
   const db = getDb();
   const existing = db

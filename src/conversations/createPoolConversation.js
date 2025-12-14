@@ -1,5 +1,5 @@
 import { InlineKeyboard } from "grammy";
-import { createPool, ensureParticipant, getKnownParticipants } from "../services/poolService.js";
+import { createPool, ensureParticipant, getKnownParticipants, getOwnerPoolHints } from "../services/poolService.js";
 import { upsertUserFromTelegram, getDisplayName } from "../services/userService.js";
 import { escapeHtml, formatAmount, formatPaymentDetails } from "../utils/text.js";
 import logger from "../utils/logger.js";
@@ -38,16 +38,40 @@ const askAmountType = async (conversation, ctx) => {
   return data === "amount_total" ? "total" : "per_person";
 };
 
-const askAmountValue = async (conversation, ctx, amountType) => {
+const askAmountValue = async (conversation, ctx, amountType, hints) => {
   const hint =
     amountType === "total"
       ? `<b>Общая сумма сбора в рублях?</b>\nОтправь число, можно с копейками через точку.`
       : `<b>Сколько должен внести каждый участник в рублях?</b>\nОтправь число, можно с копейками через точку.`;
 
-  await ctx.reply(`💵 ${hint}`, { parse_mode: "HTML" });
+  const suggestions = amountType === "total" ? hints?.totalAmounts ?? [] : hints?.perPersonAmounts ?? [];
+  const keyboard =
+    suggestions.length > 0
+      ? suggestions.slice(0, 5).reduce((kb, value, idx) => {
+          const label = formatAmount(value);
+          if (idx > 0 && idx % 2 === 0) kb = kb.row();
+          return kb.text(label, `amount_pick:${value}`);
+        }, new InlineKeyboard())
+      : undefined;
+
+  await ctx.reply(`💵 ${hint}`, { parse_mode: "HTML", reply_markup: keyboard });
 
   while (true) {
-    const { message } = await conversation.waitFor("message:text");
+    const incoming = await conversation.wait();
+    const { message, callbackQuery } = incoming;
+
+    if (callbackQuery?.data?.startsWith("amount_pick:")) {
+      await ctx.api.answerCallbackQuery(callbackQuery.id);
+      const rawValue = callbackQuery.data.split(":")[1];
+      const numeric = Number(String(rawValue).replace(",", "."));
+      if (!Number.isNaN(numeric) && numeric > 0) {
+        return numeric;
+      }
+      continue;
+    }
+
+    if (!message?.text) continue;
+
     const raw = message.text.replace(",", ".").trim();
     const value = Number(raw);
     if (!Number.isNaN(value) && value > 0) {
@@ -57,13 +81,39 @@ const askAmountValue = async (conversation, ctx, amountType) => {
   }
 };
 
-const askPaymentDetails = async (conversation, ctx) => {
+const askPaymentDetails = async (conversation, ctx, hints) => {
+  const suggestions = hints?.paymentDetails ?? [];
+  const keyboard =
+    suggestions.length > 0
+      ? suggestions.slice(0, 5).reduce((kb, value, idx) => {
+          const compact = value.replace(/\s+/g, " ").trim();
+          const label = compact.length > 20 ? `${compact.slice(0, 18)}…` : compact;
+          if (idx > 0) kb = kb.row();
+          return kb.text(label, `pdetails:${idx}`);
+        }, new InlineKeyboard())
+      : undefined;
+
   await ctx.reply("🏦 <b>Укажи реквизиты</b>\nКуда переводить деньги (номер карты, телефон, ссылка и т.п.).", {
-    parse_mode: "HTML"
+    parse_mode: "HTML",
+    reply_markup: keyboard
   });
 
   while (true) {
-    const { message } = await conversation.waitFor("message:text");
+    const incoming = await conversation.wait();
+    const { message, callbackQuery } = incoming;
+
+    if (callbackQuery?.data?.startsWith("pdetails:")) {
+      await ctx.api.answerCallbackQuery(callbackQuery.id);
+      const idx = Number(callbackQuery.data.split(":")[1]);
+      const preset = suggestions[idx];
+      if (preset) {
+        return preset.slice(0, 500);
+      }
+      continue;
+    }
+
+    if (!message?.text) continue;
+
     const details = message.text.trim();
     if (details.length >= 4) {
       return details.slice(0, 500);
@@ -158,9 +208,10 @@ export const createPoolConversation = async (conversation, ctx) => {
   }
 
   const title = await askForTitle(conversation, ctx);
+  const hints = await getOwnerPoolHints(owner.id);
   const amountType = await askAmountType(conversation, ctx);
-  const amountValue = await askAmountValue(conversation, ctx, amountType);
-  const paymentDetails = await askPaymentDetails(conversation, ctx);
+  const amountValue = await askAmountValue(conversation, ctx, amountType, hints);
+  const paymentDetails = await askPaymentDetails(conversation, ctx, hints);
   const knownParticipants = await getKnownParticipants(owner.id);
   const selectedParticipants = await askParticipants(conversation, ctx, knownParticipants, owner);
   const expectedParticipantsCount =
