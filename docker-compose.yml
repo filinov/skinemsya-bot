@@ -25,10 +25,9 @@ services:
     container_name: mongo-db
     restart: unless-stopped
     environment:
-      []
       # - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
       # - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
-      # - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
+      - MONGO_INITDB_DATABASE=admin
     ports:
       []
       # В продакшене лучше не открывать порт наружу
