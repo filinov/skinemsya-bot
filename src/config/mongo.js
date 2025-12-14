@@ -5,14 +5,6 @@ import env from "./env.js";
 mongoose.set("strictQuery", true);
 
 export const connectToMongoDB = async () => {
-
-  const { MongoClient } = require('mongodb');
-
-  MongoClient.connect('mongodb://gen_user:~%3B*%40_4tDtAjFxR@192.168.0.5:27017/default_db?authSource=admin&directConnection=true', function (err, db) {
-    console.log("Connected successfully to server");
-    db.close();
-  })
-
   try {
     console.log("🔌 Connecting to MongoDB...", env.mongodbUri);
     await mongoose.connect(env.mongodbUri, {
