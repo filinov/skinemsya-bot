@@ -1,7 +1,7 @@
 import { InlineKeyboard } from "grammy";
 import { createPool, ensureParticipant, getKnownParticipants } from "../services/poolService.js";
 import { upsertUserFromTelegram, getDisplayName } from "../services/userService.js";
-import { escapeHtml, formatAmount } from "../utils/text.js";
+import { escapeHtml, formatAmount, formatPaymentDetails } from "../utils/text.js";
 import logger from "../utils/logger.js";
 import { sendMainMenu } from "../handlers/menuHandlers.js";
 import { renderOwnerPool } from "../handlers/ownerHandlers.js";
@@ -177,7 +177,9 @@ export const createPoolConversation = async (conversation, ctx) => {
 
   const summary = `🧾 <b>Проверим детали сбора</b>\n\n📛 <b>Название:</b> ${escapeHtml(
     title
-  )}\n${shareText}\n🏦 <b>Реквизиты:</b> <code>${escapeHtml(paymentDetails)}</code>\n👥 <b>Участников сейчас:</b> ${selectedParticipants.length}`;
+  )}\n${shareText}\n🏦 <b>Реквизиты:</b> ${formatPaymentDetails(
+    paymentDetails
+  )}\n👥 <b>Участников сейчас:</b> ${selectedParticipants.length}`;
 
   const confirmed = await askConfirmation(conversation, ctx, summary);
   if (!confirmed) {
@@ -214,7 +216,8 @@ export const createPoolConversation = async (conversation, ctx) => {
         const participantView = buildParticipantPoolView(pool);
         await ctx.api.sendMessage(user.telegramId, participantView.text, {
           parse_mode: "HTML",
-          reply_markup: participantView.keyboard
+          reply_markup: participantView.keyboard,
+          disable_web_page_preview: true
         });
       } catch (error) {
         logger.warn(

@@ -1,8 +1,21 @@
 import { InlineKeyboard } from "grammy";
 import { getBotUsername } from "../utils/botInfo.js";
+import { getDisplayName } from "../services/userService.js";
 import { escapeHtml, formatAmount, poolHeadline, statusEmoji } from "../utils/text.js";
 
 const participantStatusIcon = (participant) => statusEmoji[participant.status] || statusEmoji.default;
+
+const buildOrganizerLink = (owner) => {
+  const displayName = escapeHtml(getDisplayName(owner));
+  if (owner?.username) {
+    return `<a href="https://t.me/${owner.username}">${displayName}</a>`;
+  }
+  const numericId = owner?.telegramId ? String(owner.telegramId).replace(/\\D/g, "") : "";
+  if (numericId) {
+    return `<a href="tg://user?id=${numericId}">${displayName}</a>`;
+  }
+  return displayName;
+};
 
 const formatParticipantContribution = (participant, pool, index) => {
   const expectedAmount =
@@ -50,8 +63,10 @@ export const buildParticipantPoolView = (pool) => {
     .row()
     .text("💵 Отдал(а) лично", `pay:${pool.id}:cash`);
 
+  const organizer = buildOrganizerLink(pool.owner);
+
   return {
-    text: `${poolHeadline(pool)}\n\n⚠️ <b>Важно:</b> Как только переведешь (или отдашь наличкой), отметься внизу, чтобы я передал информацию организатору. 👇`,
+    text: `${poolHeadline(pool)}\n\n👑 Организатор: ${organizer}\n\n⚠️ <b>Важно:</b> Как только переведешь (или отдашь наличкой), отметься внизу, чтобы я передал информацию организатору. 👇`,
     keyboard
   };
 };

@@ -41,7 +41,7 @@ export const handleJoin = async (ctx, joinCode) => {
 
   const { text, keyboard } = buildParticipantPoolView(updatedPool);
 
-  await ctx.reply(text, { reply_markup: keyboard, parse_mode: "HTML" });
+  await ctx.reply(text, { reply_markup: keyboard, parse_mode: "HTML", disable_web_page_preview: true });
 };
 
 export const handlePay = async (ctx) => {

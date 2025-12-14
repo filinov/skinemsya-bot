@@ -24,14 +24,47 @@ export const participantStatusLine = (participant) => {
   return `${emoji} <b>${escapeHtml(participant.displayName)}</b>${amountText}`;
 };
 
+const PHONE_REGEX = /(?:\+7|8)\s*\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}/g;
+
+export const formatPaymentDetails = (details) => {
+  if (!details) return "—";
+  const source = String(details);
+  let lastIndex = 0;
+  let hasPhone = false;
+  const parts = [];
+
+  for (const match of source.matchAll(PHONE_REGEX)) {
+    const start = match.index ?? 0;
+    if (start > lastIndex) {
+      parts.push(escapeHtml(source.slice(lastIndex, start)));
+    }
+    const phone = match[0];
+    parts.push(`<code>${escapeHtml(phone)}</code>`);
+    lastIndex = start + phone.length;
+    hasPhone = true;
+  }
+
+  if (lastIndex < source.length) {
+    parts.push(escapeHtml(source.slice(lastIndex)));
+  }
+
+  if (!hasPhone) {
+    return `<code>${escapeHtml(source)}</code>`;
+  }
+
+  return parts.join("");
+};
+
 export const poolHeadline = (pool) => {
   if (!pool) return "Сбор не найден";
   const amountText =
     pool.amountType === "per_person"
-      ? `💰Скидываемся по: <b>${formatAmount(pool.perPersonAmount, pool.currency)}</b>`
-      : `Общая сумма: <b>${formatAmount(pool.totalAmount, pool.currency)}</b>\nВзнос с человека: <b>${formatAmount(
+      ? `💰 Скидываемся по: <b>${formatAmount(pool.perPersonAmount, pool.currency)}</b>`
+      : `💰 Общая сумма: <b>${formatAmount(pool.totalAmount, pool.currency)}</b>\nВзнос с человека: <b>${formatAmount(
           pool.shareAmount,
           pool.currency
         )}</b>`;
-  return `🎉 <b>${escapeHtml(pool.title)}</b>\n\n${amountText}\nРеквизиты для перевода: <code>${escapeHtml(pool.paymentDetails)}</code>`;
+  return `🎉 <b>${escapeHtml(pool.title)}</b>\n\n${amountText}\n💳 Реквизиты для перевода: ${formatPaymentDetails(
+    pool.paymentDetails
+  )}`;
 };
