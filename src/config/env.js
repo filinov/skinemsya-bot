@@ -71,6 +71,4 @@ if (errors.length > 0) {
 
 Object.freeze(env);
 
-console.log('конфигурация', { env });
-
 export default env;
