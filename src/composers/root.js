@@ -8,8 +8,9 @@ import {
   manualConfirmPayment,
   manualConfirmPaymentFromMenu,
   openPool,
-  askPaymentAmount,
-  requestCustomPaymentAmount,
+  confirmDeletePool,
+  deletePool,
+  confirmClosePool,
   setFullPaymentAmount,
   selfConfirmPayment,
   sendPaymentMenu,
@@ -61,15 +62,17 @@ composer.callbackQuery(new RegExp(`^pay:${poolIdPattern}:(transfer|cash)$`), han
 composer.callbackQuery(new RegExp(`^pool:${poolIdPattern}$`), sendOwnerPool);
 composer.callbackQuery(new RegExp(`^confirm:${poolIdPattern}:${poolIdPattern}$`), confirmPayment);
 composer.callbackQuery(new RegExp(`^manual:${poolIdPattern}:${poolIdPattern}$`), manualConfirmPayment);
+composer.callbackQuery(new RegExp(`^close_confirm:${poolIdPattern}$`), confirmClosePool);
 composer.callbackQuery(new RegExp(`^close:${poolIdPattern}$`), closePool);
 composer.callbackQuery(new RegExp(`^open:${poolIdPattern}$`), openPool);
+composer.callbackQuery(new RegExp(`^delete_confirm:${poolIdPattern}$`), confirmDeletePool);
+composer.callbackQuery(new RegExp(`^delete:${poolIdPattern}$`), deletePool);
 composer.callbackQuery(new RegExp(`^pmenu:${poolIdPattern}:(\\d+)$`), sendPaymentMenu);
 composer.callbackQuery(new RegExp(`^pmc:${poolIdPattern}:${poolIdPattern}:(\\d+)$`), confirmPaymentFromMenu);
 composer.callbackQuery(new RegExp(`^pmm:${poolIdPattern}:${poolIdPattern}:(\\d+)$`), manualConfirmPaymentFromMenu);
 composer.callbackQuery(new RegExp(`^selfpay:${poolIdPattern}:(\\d+)$`), selfConfirmPayment);
-composer.callbackQuery(new RegExp(`^pamount:${poolIdPattern}:${poolIdPattern}:(\\d+):(confirm|manual|c|m)$`), askPaymentAmount);
+composer.callbackQuery(new RegExp(`^pamount:${poolIdPattern}:${poolIdPattern}:(\\d+):(confirm|manual|c|m)$`), setFullPaymentAmount);
 composer.callbackQuery(new RegExp(`^pafull:${poolIdPattern}:${poolIdPattern}:(\\d+):(confirm|manual|c|m)$`), setFullPaymentAmount);
-composer.callbackQuery(new RegExp(`^pacustom:${poolIdPattern}:${poolIdPattern}:(\\d+):(confirm|manual|c|m)$`), requestCustomPaymentAmount);
 composer.on("message:text", handlePaymentAmountInput);
 
 export default composer;

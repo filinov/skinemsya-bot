@@ -41,8 +41,8 @@ const askAmountType = async (conversation, ctx) => {
 const askAmountValue = async (conversation, ctx, amountType, hints) => {
   const hint =
     amountType === "total"
-      ? `<b>Общая сумма сбора в рублях?</b>\nОтправь число, можно с копейками через точку.`
-      : `<b>Сколько должен внести каждый участник в рублях?</b>\nОтправь число, можно с копейками через точку.`;
+      ? `<b>💰 Какую общую сумму нужно собрать?</b>\nОтправь число, можно с копейками через точку.`
+      : `<b>💰 Сколько должен внести каждый участник в рублях?</b>\nОтправь число, можно с копейками через точку.`;
 
   const suggestions = amountType === "total" ? hints?.totalAmounts ?? [] : hints?.perPersonAmounts ?? [];
   const keyboard =
@@ -123,17 +123,17 @@ const askPaymentDetails = async (conversation, ctx, hints) => {
 };
 
 const askParticipants = async (conversation, ctx, knownParticipants, owner) => {
-  if (!knownParticipants.length) {
+  const ownerId = owner?.id;
+  const candidates = ownerId ? knownParticipants.filter((p) => p.id !== ownerId) : knownParticipants;
+
+  if (!candidates.length) {
     return [];
   }
 
-  const ownerId = owner?.id;
-  const list = knownParticipants
+  const list = candidates
     .map((user, idx) => {
       const baseName = getDisplayName(user);
-      const isOwner = ownerId && user.id === ownerId;
-      const nameWithTag = isOwner ? `${baseName} (вы)` : baseName;
-      return `${idx + 1}. ${nameWithTag}${user.username && !isOwner ? ` (@${user.username})` : ""}`;
+      return `${idx + 1}. ${baseName}${user.username ? ` (@${user.username})` : ""}`;
     })
     .join("\n");
 
@@ -167,7 +167,7 @@ const askParticipants = async (conversation, ctx, knownParticipants, owner) => {
 
     const unique = Array.from(new Set(numbers));
     const selected = unique
-      .map((n) => knownParticipants[n - 1])
+      .map((n) => candidates[n - 1])
       .filter(Boolean);
 
     if (selected.length) return selected;
@@ -222,15 +222,15 @@ export const createPoolConversation = async (conversation, ctx) => {
   const shareText =
     amountType === "per_person"
       ? `💳 <b>С каждого:</b> ${formatAmount(amountValue)}`
-      : `💰 <b>Общая сумма:</b> ${formatAmount(amountValue)}\n🧮 <b>Взнос с человека:</b> ${formatAmount(
+      : `🎯 <b>Общая сумма:</b> ${formatAmount(amountValue)}\n💰 <b>Взнос с человека:</b> ${formatAmount(
           Math.ceil(amountValue / expectedParticipantsCount)
         )}`;
 
-  const summary = `🧾 <b>Проверим детали сбора</b>\n\n📛 <b>Название:</b> ${escapeHtml(
+  const summary = `👀 <b>Проверь детали сбора</b>\n\n🎁 <b>Название:</b> ${escapeHtml(
     title
   )}\n${shareText}\n🏦 <b>Реквизиты:</b> ${formatPaymentDetails(
     paymentDetails
-  )}\n👥 <b>Участников сейчас:</b> ${selectedParticipants.length}`;
+  )}\n👥 <b>Участников в списке:</b> ${selectedParticipants.length}`;
 
   const confirmed = await askConfirmation(conversation, ctx, summary);
   if (!confirmed) {
@@ -239,16 +239,26 @@ export const createPoolConversation = async (conversation, ctx) => {
     return;
   }
 
-  let pool = await createPool({
-    ownerId: owner.id,
-    title,
-    amountType,
-    totalAmount: amountType === "total" ? amountValue : undefined,
-    perPersonAmount: amountType === "per_person" ? amountValue : undefined,
-    paymentDetails,
-    participants: selectedParticipants,
-    expectedParticipantsCount
-  });
+  let pool = null;
+  try {
+    pool = await createPool({
+      ownerId: owner.id,
+      title,
+      amountType,
+      totalAmount: amountType === "total" ? amountValue : undefined,
+      perPersonAmount: amountType === "per_person" ? amountValue : undefined,
+      paymentDetails,
+      participants: selectedParticipants,
+      expectedParticipantsCount
+    });
+  } catch (error) {
+    logger.error({ error }, "Failed to create pool");
+    await ctx.reply("❌ Не получилось создать сбор. Попробуй еще раз позже или начни заново.", {
+      parse_mode: "HTML"
+    });
+    await sendMainMenu(ctx);
+    return;
+  }
 
   if (selectedParticipants.length) {
     const shareAmount =

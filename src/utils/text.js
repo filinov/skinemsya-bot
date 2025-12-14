@@ -60,11 +60,11 @@ export const poolHeadline = (pool) => {
   const amountText =
     pool.amountType === "per_person"
       ? `💰 Скидываемся по: <b>${formatAmount(pool.perPersonAmount, pool.currency)}</b>`
-      : `💰 Общая сумма: <b>${formatAmount(pool.totalAmount, pool.currency)}</b>\nВзнос с человека: <b>${formatAmount(
+      : `🎯 Общая сумма: <b>${formatAmount(pool.totalAmount, pool.currency)}</b>\n💰 Взнос с человека: <b>${formatAmount(
           pool.shareAmount,
           pool.currency
         )}</b>`;
-  return `🎉 <b>${escapeHtml(pool.title)}</b>\n\n${amountText}\n💳 Реквизиты для перевода: ${formatPaymentDetails(
+  return `🎉 <b>${escapeHtml(pool.title)}</b>\n\n${amountText}\n💳 Переводим: ${formatPaymentDetails(
     pool.paymentDetails
   )}`;
 };

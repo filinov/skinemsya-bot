@@ -13,9 +13,9 @@ let webhookServer = null;
 
 const setupBotCommands = async (bot) => {
   const commands = [
-    { command: "new", description: "Создать сбор" },
-    { command: "pools", description: "Мои сборы" },
-    { command: "help", description: "Помощь" }
+    { command: "new", description: "➕ Создать сбор" },
+    { command: "pools", description: "📋 Мои сборы" },
+    { command: "help", description: "❓ Помощь" }
   ];
 
   try {

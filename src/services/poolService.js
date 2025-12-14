@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import getDb, { poolParticipants, pools, users } from "../config/db.js";
 import { getDisplayName } from "./userService.js";
 
@@ -104,7 +104,7 @@ export const getPoolsByOwner = async (ownerId, { limit = 10, page = 1 } = {}) =>
     .select()
     .from(pools)
     .where(eq(pools.ownerId, ownerId))
-    .orderBy(desc(pools.createdAt))
+    .orderBy(asc(pools.isClosed), desc(pools.createdAt))
     .offset((safePage - 1) * safeLimit)
     .limit(safeLimit)
     .all();
@@ -160,6 +160,15 @@ export const getOwnerPoolHints = (ownerId, { limit = 5 } = {}) => {
   );
 
   return { totalAmounts, perPersonAmounts, paymentDetails };
+};
+
+export const deletePoolByOwner = async ({ poolId, ownerId }) => {
+  const db = getDb();
+  const pool = getPoolByIdForOwner(poolId, ownerId);
+  if (!pool || !pool.isClosed) return null;
+
+  db.delete(pools).where(and(eq(pools.id, poolId), eq(pools.ownerId, ownerId))).run();
+  return pool;
 };
 
 export const ensureParticipant = async (pool, user, opts = {}) => {

@@ -1,13 +1,9 @@
 import { InlineKeyboard } from "grammy";
-import {
-  ensureParticipant,
-  getPoolById,
-  getPoolByJoinCode,
-  markParticipantPaid
-} from "../services/poolService.js";
+import { ensureParticipant, getPoolById, getPoolByJoinCode, markParticipantPaid } from "../services/poolService.js";
 import { buildParticipantPoolView } from "../presenters/poolPresenter.js";
 import { getDisplayName } from "../services/userService.js";
 import { ensureUserInContext } from "../utils/context.js";
+import { encodeInlineId } from "../utils/idCodec.js";
 import logger from "../utils/logger.js";
 import { escapeHtml } from "../utils/text.js";
 import { sendMainMenu } from "./menuHandlers.js";
@@ -91,7 +87,10 @@ export const handlePay = async (ctx) => {
     const participant = updated.participants.find((p) => p.userId === user.id);
     const keyboard =
       participant && participant.id
-        ? new InlineKeyboard().text("Подтвердить взнос", `pamount:${updated.id}:${participant.id}:1:c`)
+        ? new InlineKeyboard().text(
+            "Подтвердить взнос",
+            `pafull:${encodeInlineId(updated.id)}:${encodeInlineId(participant.id)}:1:c`
+          )
         : undefined;
     await ctx.api.sendMessage(updated.owner.telegramId, text, {
       parse_mode: "HTML",

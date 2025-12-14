@@ -5,15 +5,17 @@ import {
   getPoolsByOwner,
   manualConfirmParticipantPayment,
   markOwnerSelfPayment,
+  deletePoolByOwner,
   setPoolClosed
 } from "../services/poolService.js";
 import { ensureUserInContext } from "../utils/context.js";
 import { buildOwnerPoolView } from "../presenters/poolPresenter.js";
 import { replyOrEdit } from "../utils/reply.js";
-import { escapeHtml, formatAmount } from "../utils/text.js";
+import { escapeHtml } from "../utils/text.js";
+import { decodeInlineId, encodeInlineId } from "../utils/idCodec.js";
 import logger from "../utils/logger.js";
 
-const POOLS_PAGE_SIZE = 3;
+const POOLS_PAGE_SIZE = 6;
 const PAYMENT_MENU_PAGE_SIZE = 6;
 
 const normalizePaymentMode = (mode) => {
@@ -21,14 +23,6 @@ const normalizePaymentMode = (mode) => {
   if (mode === "m" || mode === "manual") return "manual";
   if (mode === "s" || mode === "self") return "self";
   return mode;
-};
-
-const compactPaymentMode = (mode) => {
-  const normalized = normalizePaymentMode(mode);
-  if (normalized === "confirm") return "c";
-  if (normalized === "manual") return "m";
-  if (normalized === "self") return "s";
-  return normalized || "";
 };
 
 const findOwnerParticipant = (pool, owner) => {
@@ -47,11 +41,15 @@ export const renderOwnerPool = async (ctx, pool) => {
 
   if (!pool.isClosed) {
     keyboard.url("📨 Пригласить участников", shareUrl).row();
-    keyboard.text("💸 Отметить взнос", `pmenu:${pool.id}:1`).row();
+    keyboard.text("✍️ Отметить взнос", `pmenu:${encodeInlineId(pool.id)}:1`).row();
   }
 
   const toggleLabel = pool.isClosed ? "🔓 Открыть сбор" : "⛔️ Закрыть сбор";
-  keyboard.row().text(toggleLabel, `${pool.isClosed ? "open" : "close"}:${pool.id}`);
+  const toggleAction = pool.isClosed ? `open:${encodeInlineId(pool.id)}` : `close_confirm:${encodeInlineId(pool.id)}`;
+  keyboard.row().text(toggleLabel, toggleAction);
+  if (pool.isClosed) {
+    keyboard.row().text("🗑 Удалить сбор", `delete_confirm:${encodeInlineId(pool.id)}`);
+  }
   keyboard.row().text("⬅️ К списку", "action:pools");
 
   const messageOptions = {
@@ -93,44 +91,50 @@ const buildPaymentMenu = (pool, page = 1, owner) => {
   const lines = items.length
     ? items.map((p, idx) => {
         const position = start + idx + 1;
-        const expected = participantExpectedAmount(p, pool);
-        const paid =
-          p.paidAmount ?? (p.status === "marked_paid" || p.status === "confirmed" ? expected : 0);
-        const paidText = formatAmount(paid, pool.currency);
-        const expectedText = formatAmount(expected, pool.currency);
-        return `${position}. <b>${escapeHtml(p.displayName)}</b> — (${paidText} из ${expectedText})`;
+        const icon = p.status === "confirmed" ? "✅" : p.status === "marked_paid" ? "⏳" : "❌";
+        return `${position}. ${icon} <b>${escapeHtml(p.displayName)}</b>`;
       })
     : ["Пока нет участников. Отправь ссылку, чтобы они присоединились."];
 
   const keyboard = new InlineKeyboard();
   if (!ownerPaid) {
-    keyboard.text("Отметить свой взнос", `selfpay:${pool.id}:${currentPage}`).row();
+    keyboard.text("Отметить свой взнос", `selfpay:${encodeInlineId(pool.id)}:${currentPage}`).row();
   }
   items.forEach((p) => {
     if (p.status === "confirmed") {
       return;
     }
     if (p.status === "marked_paid") {
-      keyboard.text(`Подтвердить: ${p.displayName}`, `pamount:${pool.id}:${p.id}:${currentPage}:c`).row();
+      keyboard
+        .text(
+          `Подтвердить: ${p.displayName}`,
+          `pafull:${encodeInlineId(pool.id)}:${encodeInlineId(p.id)}:${currentPage}:c`
+        )
+        .row();
       return;
     }
-    keyboard.text(`Отметить взнос: ${p.displayName}`, `pamount:${pool.id}:${p.id}:${currentPage}:m`).row();
+    keyboard
+      .text(
+        `Отметить взнос: ${p.displayName}`,
+        `pafull:${encodeInlineId(pool.id)}:${encodeInlineId(p.id)}:${currentPage}:m`
+      )
+      .row();
   });
 
   if (totalPages > 1) {
     const hasPrev = currentPage > 1;
     const hasNext = currentPage < totalPages;
     const navRow = new InlineKeyboard();
-    if (hasPrev) navRow.text("◀️", `pmenu:${pool.id}:${currentPage - 1}`);
+    if (hasPrev) navRow.text("◀️", `pmenu:${encodeInlineId(pool.id)}:${currentPage - 1}`);
     navRow.text(`Стр. ${currentPage}/${totalPages}`, "noop");
-    if (hasNext) navRow.text("▶️", `pmenu:${pool.id}:${currentPage + 1}`);
+    if (hasNext) navRow.text("▶️", `pmenu:${encodeInlineId(pool.id)}:${currentPage + 1}`);
     keyboard.inline_keyboard.push(navRow.inline_keyboard[0]);
   }
 
-  keyboard.text("⬅️ Назад к сбору", `pool:${pool.id}`);
+  keyboard.text("⬅️ Назад к сбору", `pool:${encodeInlineId(pool.id)}`);
 
   return {
-    text: `💸 <b>Отметьте кто сделал взнос</b>\n\n${lines.join("\n")}`,
+    text: `💸 <b>Отметьте кто сделал взнос</b>\nИспользуй кнопки ниже для отметки или подтверждения.\n\n${lines.join("\n")}`,
     keyboard,
     currentPage,
     totalPages
@@ -196,30 +200,28 @@ export const sendOwnerPools = async (ctx, page = 1) => {
   pools.forEach((pool) => {
     const title = pool.title.slice(0, 36);
     const label = pool.isClosed ? `🔒 ${title}` : title;
-    keyboard.text(label, `pool:${pool.id}`).row();
+    keyboard.text(label, `pool:${encodeInlineId(pool.id)}`).row();
   });
 
   if (totalPages > 1) {
     const hasPrev = currentPage > 1;
     const hasNext = currentPage < totalPages;
     const navRow = new InlineKeyboard();
-    if (hasPrev) navRow.text("◀️ назад", `pools:page:${currentPage - 1}`);
-    navRow.text(`Стр. ${currentPage}/${totalPages}`, "noop");
-    if (hasNext) navRow.text("▶️ вперёд", `pools:page:${currentPage + 1}`);
+    navRow.text("◀️", hasPrev ? `pools:page:${currentPage - 1}` : "noop");
+    navRow.text(`${currentPage} из ${totalPages}`, "noop");
+    navRow.text("▶️", hasNext ? `pools:page:${currentPage + 1}` : "noop");
     keyboard.inline_keyboard.push(navRow.inline_keyboard[0]);
   }
 
   keyboard.row().text("⬅️ В меню", "action:menu");
 
-  const pageInfo = totalPages > 1 ? `\n\n(стр. ${currentPage}/${totalPages})` : "";
-
-  await replyOrEdit(ctx, `📂 <b>Выбери сбор, чтобы посмотреть статус</b>:`, {
+  await replyOrEdit(ctx, `📂 <b>Мои сборы</b>\nВыбери нужный, чтобы посмотреть детали.`, {
     reply_markup: keyboard
   });
 };
 
 export const sendOwnerPool = async (ctx) => {
-  const poolId = ctx.match[1];
+  const poolId = decodeInlineId(ctx.match[1]);
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
     await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
@@ -239,7 +241,7 @@ export const sendOwnerPool = async (ctx) => {
 };
 
 export const sendPaymentMenu = async (ctx) => {
-  const [poolId, pageRaw] = [ctx.match[1], ctx.match[2]];
+  const [poolId, pageRaw] = [decodeInlineId(ctx.match[1]), ctx.match[2]];
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
     await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
@@ -264,19 +266,13 @@ export const sendPaymentMenu = async (ctx) => {
   }
 };
 
-const buildAmountChoiceKeyboard = (pool, participant, page, mode) => {
-  const expected = participantExpectedAmount(participant, pool);
-  const modeToken = compactPaymentMode(mode) || "m";
-  return new InlineKeyboard()
-    .text(`💯 Всю сумму (${formatAmount(expected, pool.currency)})`, `pafull:${pool.id}:${participant.id}:${page}:${modeToken}`)
-    .row()
-    .text("✏️ Ввести сумму", `pacustom:${pool.id}:${participant.id}:${page}:${modeToken}`)
-    .row()
-    .text("⬅️ Назад", `pmenu:${pool.id}:${page}`);
-};
-
 export const askPaymentAmount = async (ctx) => {
-  const [poolId, participantId, pageRaw, modeRaw] = [ctx.match[1], ctx.match[2], ctx.match[3], ctx.match[4]];
+  const [poolId, participantId, pageRaw, modeRaw] = [
+    decodeInlineId(ctx.match[1]),
+    decodeInlineId(ctx.match[2]),
+    ctx.match[3],
+    ctx.match[4]
+  ];
   const mode = normalizePaymentMode(modeRaw);
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
@@ -302,14 +298,23 @@ export const askPaymentAmount = async (ctx) => {
   }
 
   const expected = participantExpectedAmount(participant, pool);
-  const kb = buildAmountChoiceKeyboard(pool, participant, Number(pageRaw ?? 1), mode);
-  const text = `Сколько внес ${escapeHtml(participant.displayName)}?\nОжидается: <b>${formatAmount(
-    expected,
-    pool.currency
-  )}</b>`;
-
-  await ctx.editMessageText(text, { reply_markup: kb, parse_mode: "HTML", disable_web_page_preview: true });
-  await ctx.answerCallbackQuery();
+  const page = Number(pageRaw ?? 1);
+  const target = extractTargetMessage(ctx);
+  const updatedPool = await applyOwnerAmountUpdate({
+    ctx,
+    poolId,
+    participantId,
+    owner,
+    amount: expected,
+    page,
+    mode,
+    targetMessage: target
+  });
+  if (!updatedPool) return;
+  await ctx.answerCallbackQuery({ text: "Взнос отмечен" });
+  if (mode === "confirm" || mode === "manual") {
+    await notifyPaymentConfirmed({ ctx, pool: updatedPool, participantId, owner });
+  }
 };
 
 const applyOwnerAmountUpdate = async ({ ctx, poolId, participantId, owner, amount, page, mode, targetMessage }) => {
@@ -362,7 +367,12 @@ const notifyParticipantsPoolClosed = async (ctx, pool, owner) => {
 };
 
 export const setFullPaymentAmount = async (ctx) => {
-  const [poolId, participantId, pageRaw, modeRaw] = [ctx.match[1], ctx.match[2], ctx.match[3], ctx.match[4]];
+  const [poolId, participantId, pageRaw, modeRaw] = [
+    decodeInlineId(ctx.match[1]),
+    decodeInlineId(ctx.match[2]),
+    ctx.match[3],
+    ctx.match[4]
+  ];
   const mode = normalizePaymentMode(modeRaw);
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
@@ -404,106 +414,18 @@ export const setFullPaymentAmount = async (ctx) => {
 };
 
 export const requestCustomPaymentAmount = async (ctx) => {
-  const [poolId, participantId, pageRaw, modeRaw] = [ctx.match[1], ctx.match[2], ctx.match[3], ctx.match[4]];
-  const mode = normalizePaymentMode(modeRaw);
-  const owner = (await ensureUserInContext(ctx))?.user;
-  if (!owner) {
-    await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
-    return;
-  }
-
-  const pool = await getPoolByIdForOwner(poolId, owner.id);
-  if (!pool) {
-    await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
-    return;
-  }
-  if (pool.isClosed) {
-    await ctx.answerCallbackQuery({ text: "Сбор закрыт, отметки недоступны", show_alert: true });
-    return;
-  }
-
-  const participant = findParticipantById(pool, participantId);
-  if (!participant) {
-    await ctx.answerCallbackQuery({ text: "Участник не найден", show_alert: true });
-    await renderPaymentMenu(ctx, pool, Number(pageRaw ?? 1), owner);
-    return;
-  }
-
-  const target = extractTargetMessage(ctx);
-  ctx.session.pendingPaymentAmount = {
-    poolId,
-    participantId,
-    page: Number(pageRaw ?? 1),
-    mode,
-    targetMessage: target
-  };
-
-  const expected = participantExpectedAmount(participant, pool);
-  await ctx.answerCallbackQuery({ text: "Введи сумму цифрой", show_alert: false });
-  await ctx.reply(
-    `✏️ Напиши сумму взноса для ${escapeHtml(participant.displayName)}. Ожидается: <b>${formatAmount(
-      expected,
-      pool.currency
-    )}</b>`,
-    { parse_mode: "HTML" }
-  );
+  await ctx.answerCallbackQuery({ text: "Произвольные суммы отключены", show_alert: true });
 };
 
 export const handlePaymentAmountInput = async (ctx, next) => {
   const pending = ctx.session?.pendingPaymentAmount;
   if (!pending) return next();
-  const text = ctx.message?.text?.trim();
-  if (!text) return next();
-
-  const normalized = text.toLowerCase();
-  if (["отмена", "cancel", "stop"].includes(normalized)) {
-    ctx.session.pendingPaymentAmount = null;
-    await ctx.reply("❌ Ты отменил ввод суммы.");
-    return;
-  }
-
-  const value = Number(text.replace(",", "."));
-  if (Number.isNaN(value) || value <= 0) {
-    await ctx.reply("⚠️ Нужно положительное число. Введи сумму еще раз.");
-    return;
-  }
-
-  const owner = (await ensureUserInContext(ctx))?.user;
-  if (!owner) {
-    ctx.session.pendingPaymentAmount = null;
-    await ctx.reply("Нет доступа.");
-    return;
-  }
-
-  const { poolId, participantId, mode, page = 1, targetMessage } = pending;
   ctx.session.pendingPaymentAmount = null;
-
-  const pool =
-    mode === "self"
-      ? await markOwnerSelfPayment({ poolId, owner, amount: value })
-      : mode === "confirm"
-        ? await confirmParticipantPayment({ poolId, participantId, ownerId: owner.id, amount: value })
-        : await manualConfirmParticipantPayment({ poolId, participantId, ownerId: owner.id, amount: value });
-
-  if (!pool) {
-    await ctx.reply("Не удалось отметить взнос.");
-    return;
-  }
-  if (pool.isClosed) {
-    await ctx.reply("Сбор закрыт, отметки недоступны.");
-    return;
-  }
-
-  await ctx.reply("Взнос отмечен.");
-  await renderPaymentMenu(ctx, pool, Number(page), owner, targetMessage);
-
-  if ((mode === "confirm" || mode === "manual") && participantId) {
-    await notifyPaymentConfirmed({ ctx, pool, participantId, owner });
-  }
+  await ctx.reply("Произвольные суммы отключены. Используй фиксированную сумму в меню взносов.");
 };
 
 export const confirmPayment = async (ctx) => {
-  const [poolId, participantId] = [ctx.match[1], ctx.match[2]];
+  const [poolId, participantId] = [decodeInlineId(ctx.match[1]), decodeInlineId(ctx.match[2])];
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
     await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
@@ -534,7 +456,7 @@ export const confirmPayment = async (ctx) => {
 };
 
 export const manualConfirmPayment = async (ctx) => {
-  const [poolId, participantId] = [ctx.match[1], ctx.match[2]];
+  const [poolId, participantId] = [decodeInlineId(ctx.match[1]), decodeInlineId(ctx.match[2])];
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
     await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
@@ -564,7 +486,7 @@ export const manualConfirmPayment = async (ctx) => {
 };
 
 export const confirmPaymentFromMenu = async (ctx) => {
-  const [poolId, participantId, pageRaw] = [ctx.match[1], ctx.match[2], ctx.match[3]];
+  const [poolId, participantId, pageRaw] = [decodeInlineId(ctx.match[1]), decodeInlineId(ctx.match[2]), ctx.match[3]];
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
     await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
@@ -595,7 +517,7 @@ export const confirmPaymentFromMenu = async (ctx) => {
 };
 
 export const manualConfirmPaymentFromMenu = async (ctx) => {
-  const [poolId, participantId, pageRaw] = [ctx.match[1], ctx.match[2], ctx.match[3]];
+  const [poolId, participantId, pageRaw] = [decodeInlineId(ctx.match[1]), decodeInlineId(ctx.match[2]), ctx.match[3]];
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
     await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
@@ -626,7 +548,7 @@ export const manualConfirmPaymentFromMenu = async (ctx) => {
 };
 
 export const selfConfirmPayment = async (ctx) => {
-  const [poolId, pageRaw] = [ctx.match[1], ctx.match[2]];
+  const [poolId, pageRaw] = [decodeInlineId(ctx.match[1]), ctx.match[2]];
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
     await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
@@ -655,7 +577,7 @@ export const selfConfirmPayment = async (ctx) => {
 };
 
 export const closePool = async (ctx) => {
-  const poolId = ctx.match[1];
+  const poolId = decodeInlineId(ctx.match[1]);
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
     await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
@@ -686,8 +608,36 @@ export const closePool = async (ctx) => {
   await renderOwnerPool(ctx, pool);
 };
 
+export const confirmClosePool = async (ctx) => {
+  const poolId = decodeInlineId(ctx.match[1]);
+  const owner = (await ensureUserInContext(ctx))?.user;
+  if (!owner) {
+    await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
+    return;
+  }
+
+  const pool = await getPoolByIdForOwner(poolId, owner.id);
+  if (!pool) {
+    await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
+    return;
+  }
+  if (pool.isClosed) {
+    await ctx.answerCallbackQuery({ text: "Сбор уже закрыт" });
+    await renderOwnerPool(ctx, pool);
+    return;
+  }
+
+  const keyboard = new InlineKeyboard()
+    .text("✅ Да, закрыть", `close:${encodeInlineId(pool.id)}`)
+    .row()
+    .text("↩️ Отмена", `pool:${encodeInlineId(pool.id)}`);
+
+  await ctx.editMessageReplyMarkup({ reply_markup: keyboard });
+  await ctx.answerCallbackQuery({ text: "Подтверди закрытие" });
+};
+
 export const openPool = async (ctx) => {
-  const poolId = ctx.match[1];
+  const poolId = decodeInlineId(ctx.match[1]);
   const owner = (await ensureUserInContext(ctx))?.user;
   if (!owner) {
     await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
@@ -702,4 +652,50 @@ export const openPool = async (ctx) => {
 
   await ctx.answerCallbackQuery({ text: "Сбор снова открыт" });
   await renderOwnerPool(ctx, pool);
+};
+
+export const confirmDeletePool = async (ctx) => {
+  const poolId = decodeInlineId(ctx.match[1]);
+  const owner = (await ensureUserInContext(ctx))?.user;
+  if (!owner) {
+    await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
+    return;
+  }
+
+  const pool = await getPoolByIdForOwner(poolId, owner.id);
+  if (!pool) {
+    await ctx.answerCallbackQuery({ text: "Сбор не найден", show_alert: true });
+    return;
+  }
+  if (!pool.isClosed) {
+    await ctx.answerCallbackQuery({ text: "Удалять можно только закрытый сбор", show_alert: true });
+    return;
+  }
+
+  const keyboard = new InlineKeyboard()
+    .text("✅ Да, удалить", `delete:${encodeInlineId(pool.id)}`)
+    .row()
+    .text("↩️ Отмена", `pool:${encodeInlineId(pool.id)}`);
+
+  await ctx.editMessageReplyMarkup({ reply_markup: keyboard });
+  await ctx.answerCallbackQuery({ text: "Подтверди удаление" });
+};
+
+export const deletePool = async (ctx) => {
+  const poolId = decodeInlineId(ctx.match[1]);
+  const owner = (await ensureUserInContext(ctx))?.user;
+  if (!owner) {
+    await ctx.answerCallbackQuery({ text: "Нет доступа", show_alert: true });
+    return;
+  }
+
+  const pool = await deletePoolByOwner({ poolId, ownerId: owner.id });
+  if (!pool) {
+    await ctx.answerCallbackQuery({ text: "Можно удалить только закрытый сбор", show_alert: true });
+    return;
+  }
+
+  await ctx.answerCallbackQuery({ text: "Сбор удалён" });
+  await replyOrEdit(ctx, "Сбор удалён.");
+  await sendOwnerPools(ctx);
 };

@@ -1,9 +1,13 @@
 import { InlineKeyboard } from "grammy";
 import { getBotUsername } from "../utils/botInfo.js";
 import { getDisplayName } from "../services/userService.js";
-import { escapeHtml, formatAmount, poolHeadline, statusEmoji } from "../utils/text.js";
+import { escapeHtml, formatAmount, formatPaymentDetails, poolHeadline } from "../utils/text.js";
 
-const participantStatusIcon = (participant) => statusEmoji[participant.status] || statusEmoji.default;
+const participantStatusIcon = (participant) => {
+  if (participant.status === "confirmed") return "✅";
+  if (participant.status === "marked_paid") return "⏳";
+  return "❌";
+};
 
 const buildOrganizerLink = (owner) => {
   const displayName = escapeHtml(getDisplayName(owner));
@@ -18,17 +22,24 @@ const buildOrganizerLink = (owner) => {
 };
 
 const formatParticipantContribution = (participant, pool, index) => {
-  const expectedAmount =
-    participant.expectedAmount ?? pool.shareAmount ?? pool.perPersonAmount ?? pool.totalAmount ?? 0;
-  const paidAmount =
-    participant.paidAmount ??
-    (participant.status === "marked_paid" || participant.status === "confirmed" ? expectedAmount : 0);
-
-  const paidText = formatAmount(paidAmount, pool.currency);
-  const expectedText = formatAmount(expectedAmount, pool.currency);
   const icon = participantStatusIcon(participant);
 
-  return `${icon} ${index + 1}. <b>${escapeHtml(participant.displayName)}</b> — (${paidText} из ${expectedText})`;
+  return `${index + 1}. ${icon} <b>${escapeHtml(participant.displayName)}</b>`;
+};
+
+const participantHeadline = (pool) => {
+  const share =
+    pool.shareAmount ??
+    pool.perPersonAmount ??
+    (pool.totalAmount && pool.expectedParticipantsCount
+      ? Math.ceil(pool.totalAmount / Math.max(1, pool.expectedParticipantsCount))
+      : pool.totalAmount);
+
+  const perPersonText = `💰 Скидываемся по: <b>${formatAmount(share, pool.currency)}</b>`;
+
+  return `🎉 <b>${escapeHtml(pool.title)}</b>\n\n${perPersonText}\n💳 Переводим: ${formatPaymentDetails(
+    pool.paymentDetails
+  )}`;
 };
 
 export const buildOwnerPoolView = async (pool, ctx) => {
@@ -43,16 +54,19 @@ export const buildOwnerPoolView = async (pool, ctx) => {
     return total + (Number.isFinite(paid) ? paid : 0);
   }, 0);
 
-  const participantsText = pool.participants.length
-    ? pool.participants.map((participant, idx) => formatParticipantContribution(participant, pool, idx)).join("\n")
+  const sortedParticipants = [...pool.participants].sort((a, b) => {
+    const weight = (p) => (p.status === "confirmed" ? 2 : p.status === "marked_paid" ? 1 : 0);
+    return weight(a) - weight(b);
+  });
+
+  const participantsText = sortedParticipants.length
+    ? sortedParticipants.map((participant, idx) => formatParticipantContribution(participant, pool, idx)).join("\n")
     : "Пока нет участников. Отправь ссылку, чтобы они присоединились.";
 
-  const statusText = pool.isClosed
-    ? "⛔️ Сбор закрыт. Новые участники не смогут присоединиться."
-    : `🔗 Ссылка для участников:\n${escapeHtml(link)}`;
+  const statusText = pool.isClosed ? "⛔️ Сбор закрыт. Новые участники не смогут присоединиться." : "";
 
   return {
-    text: `${poolHeadline(pool)}\n\n💰 Собрано: <b>${formatAmount(collectedAmount, pool.currency)}</b>\n\n👥 Участники и взносы:\n${participantsText}\n\n${statusText}`,
+    text: `${poolHeadline(pool)}\n\n💰 Собрано: <b>${formatAmount(collectedAmount, pool.currency)}</b>\n\n👥 Участники:\n${participantsText}\n\n${statusText}`,
     shareUrl
   };
 };
@@ -66,7 +80,7 @@ export const buildParticipantPoolView = (pool) => {
   const organizer = buildOrganizerLink(pool.owner);
 
   return {
-    text: `${poolHeadline(pool)}\n\n👑 Организатор: ${organizer}\n\n⚠️ <b>Важно:</b> Как только переведешь (или отдашь наличкой), отметься внизу, чтобы я передал информацию организатору. 👇`,
+    text: `${participantHeadline(pool)}\n\n👑 Организатор: ${organizer}\n\n⚠️ <b>Важно:</b> Как только переведешь (или отдашь наличкой), отметься внизу, чтобы я передал информацию организатору. 👇`,
     keyboard
   };
 };
