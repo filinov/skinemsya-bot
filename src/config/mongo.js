@@ -6,7 +6,7 @@ mongoose.set("strictQuery", true);
 
 export const connectToMongoDB = async () => {
   try {
-    console.log("🔌 Connecting to MongoDB...");
+    console.log("🔌 Connecting to MongoDB...", env.mongodbUri);
     await mongoose.connect(env.mongodbUri, {
       serverSelectionTimeoutMS: 5000
     });
