@@ -1,25 +1,39 @@
+# Базовый образ
 FROM node:20-alpine
 
-RUN addgroup -g 1001 -S app && \
-    adduser -u 1001 -S app -G app
-
+# Установка рабочей директории
 WORKDIR /app
 
+# Установка переменных окружения
 ENV NODE_ENV=production
 
-COPY --chown=app:app package*.json ./
+# Создание пользователя и группы для запуска приложения
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -u 1001 -S bot -G nodejs
 
+# Копирование файлов package.json и package-lock.json
+COPY --chown=bot:nodejs package*.json ./
+
+# Установка зависимостей
 RUN npm ci --omit=dev --ignore-scripts && \
     npm cache clean --force
 
-COPY --chown=app:app src ./src
+# Копирование исходного кода приложения
+COPY --chown=bot:nodejs src ./src
 
-RUN mkdir -p /app/logs && \
-    chown -R app:app /app && \
+# Создание необходимых директорий и установка прав
+RUN mkdir -p /app/logs /app/tmp && \
+    chown -R bot:nodejs /app/logs /app/tmp && \
     chmod -R 755 /app/logs
 
-USER app
+# node_modules должен быть доступен для чтения
+RUN chown -R bot:nodejs /app/node_modules 2>/dev/null || true
 
+# Переключение на пользователя bot
+USER bot
+
+# Открытие порта
 EXPOSE 3000
 
+# Команда для запуска приложения
 CMD ["node", "src/index.js"]
