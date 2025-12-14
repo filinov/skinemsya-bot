@@ -16,7 +16,7 @@ COPY --chown=bot:nodejs package*.json ./
 COPY --chown=bot:nodejs prisma ./prisma
 
 # Установка зависимостей
-RUN npm ci && \
+RUN npm install && \
     npm run prisma -- generate && \
     npm prune --omit=dev && \
     npm cache clean --force
