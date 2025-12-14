@@ -12,3 +12,8 @@ services:
       - '27017:27017' # Закомментировать для продакшена
     expose:
       - 27017
+    networks:
+      - app-network
+
+networks:
+  app-network:
