@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: skinemsya-bot
     restart: unless-stopped
-    env_file:
-      - .env
+    # env_file:
+    #   - .env
     environment:
       - NODE_ENV=production
       - ENABLE_WEBHOOK=${ENABLE_WEBHOOK}
@@ -26,8 +26,8 @@ services:
     image: mongo:7
     container_name: mongo-db
     restart: unless-stopped
-    env_file:
-      - .env
+    # env_file:
+    #   - .env
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
