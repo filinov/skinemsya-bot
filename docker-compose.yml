@@ -7,10 +7,18 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - NODE_ENV=production
+      - ENABLE_WEBHOOK=${ENABLE_WEBHOOK}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - BOT_ADMIN_ID=${BOT_ADMIN_ID}
+      - WEBHOOK_DOMAIN=${WEBHOOK_DOMAIN}
+      - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DATABASE}
     ports:
       - '3000:3000'
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     networks:
       - app-network
 
@@ -18,15 +26,32 @@ services:
     image: mongo:7
     container_name: mongo-db
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
     ports:
-      - '27017:27017'
+      # В продакшене лучше не открывать порт наружу
+      - '27017:27017' # Закомментировать для продакшена
+    expose:
+      - 27017
     volumes:
       - mongo_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - app-network
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "db.adminCommand('ping')"
+        --username ${MONGO_ROOT_USER}
+        --password ${MONGO_ROOT_PASSWORD}
+        --authenticationDatabase admin
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   app-network:
