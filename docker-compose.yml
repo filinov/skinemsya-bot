@@ -1,24 +1,24 @@
 services:
-  bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: skinemsya-bot
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      # - ENABLE_WEBHOOK=${ENABLE_WEBHOOK}
-      # - BOT_TOKEN=${BOT_TOKEN}
-      # - BOT_ADMIN_ID=${BOT_ADMIN_ID}
-      # - WEBHOOK_DOMAIN=${WEBHOOK_DOMAIN}
-      # - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DATABASE}
-    ports:
-      - '3000:3000'
-    # depends_on:
-    #   mongo:
-    #     condition: service_healthy
-    networks:
-      - app-network
+  # bot:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: skinemsya-bot
+  #   restart: unless-stopped
+  #   environment:
+  #     - NODE_ENV=production
+  #     # - ENABLE_WEBHOOK=${ENABLE_WEBHOOK}
+  #     # - BOT_TOKEN=${BOT_TOKEN}
+  #     # - BOT_ADMIN_ID=${BOT_ADMIN_ID}
+  #     # - WEBHOOK_DOMAIN=${WEBHOOK_DOMAIN}
+  #     # - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DATABASE}
+  #   ports:
+  #     - '3000:3000'
+  #   # depends_on:
+  #   #   mongo:
+  #   #     condition: service_healthy
+  #   networks:
+  #     - app-network
 
   mongo:
     image: mongo:7
