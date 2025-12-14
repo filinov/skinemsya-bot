@@ -7,24 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum AmountType {
-  total
-  per_person
-}
-
-enum ParticipantStatus {
-  invited
-  joined
-  marked_paid
-  confirmed
-}
-
-enum PayMethod {
-  transfer
-  cash
-  unknown
-}
-
 model User {
   id           String            @id @default(cuid())
   telegramId   String            @unique
@@ -46,7 +28,7 @@ model Pool {
   owner                    User              @relation("UserPools", fields: [ownerId], references: [id], onDelete: Cascade)
   title                    String
   description              String?
-  amountType               AmountType
+  amountType               String            @default("total")
   totalAmount              Float?
   perPersonAmount          Float?
   shareAmount              Float?
@@ -70,10 +52,10 @@ model PoolParticipant {
   pool           Pool              @relation(fields: [poolId], references: [id], onDelete: Cascade)
   user           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   displayName    String
-  status         ParticipantStatus @default(invited)
+  status         String            @default("invited")
   paidAmount     Float             @default(0)
   expectedAmount Float             @default(0)
-  payMethod      PayMethod         @default(unknown)
+  payMethod      String            @default("unknown")
   note           String?
   joinedAt       DateTime?
   markedAt       DateTime?
@@ -88,7 +70,7 @@ model PoolParticipant {
 
 model Session {
   key       String   @id
-  data      Json
+  data      String   @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

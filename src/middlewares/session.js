@@ -6,7 +6,7 @@ class PrismaSessionStorage {
   async read(key) {
     try {
       const record = await prisma.session.findUnique({ where: { key } });
-      return record?.data;
+      return record?.data ? JSON.parse(record.data) : undefined;
     } catch (error) {
       logger.error({ err: error, key }, "Failed to read session from database");
       throw error;
@@ -15,10 +15,11 @@ class PrismaSessionStorage {
 
   async write(key, value) {
     try {
+      const payload = JSON.stringify(value ?? {});
       await prisma.session.upsert({
         where: { key },
-        update: { data: value, updatedAt: new Date() },
-        create: { key, data: value }
+        update: { data: payload, updatedAt: new Date() },
+        create: { key, data: payload }
       });
     } catch (error) {
       logger.error({ err: error, key }, "Failed to write session to database");
