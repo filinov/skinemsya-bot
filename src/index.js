@@ -1,6 +1,6 @@
 import { Bot, GrammyError, HttpError } from "grammy";
 import { conversations, createConversation } from "@grammyjs/conversations";
-import { connectToDatabase, disconnectFromDatabase } from "./config/prisma.js";
+import { connectToDatabase, disconnectFromDatabase } from "./config/db.js";
 import setupSession from "./middlewares/session.js";
 import logger from "./utils/logger.js";
 import env from "./config/env.js";
