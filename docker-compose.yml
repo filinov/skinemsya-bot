@@ -8,12 +8,21 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
     ports:
-      # В продакшене лучше не открывать порт наружу
       - '27017:27017' # Закомментировать для продакшена
     expose:
       - 27017
     networks:
       - app-network
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "db.adminCommand('ping')"
+        --username ${MONGO_ROOT_USER}
+        --password ${MONGO_ROOT_PASSWORD}
+        --authenticationDatabase admin
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   app-network:
