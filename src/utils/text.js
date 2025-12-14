@@ -28,7 +28,7 @@ export const poolHeadline = (pool) => {
   if (!pool) return "Сбор не найден";
   const amountText =
     pool.amountType === "per_person"
-      ? `Сумма с человека: <b>${formatAmount(pool.perPersonAmount, pool.currency)}</b>`
+      ? `💰Скидываемся по: <b>${formatAmount(pool.perPersonAmount, pool.currency)}</b>`
       : `Общая сумма: <b>${formatAmount(pool.totalAmount, pool.currency)}</b>\nВзнос с человека: <b>${formatAmount(
           pool.shareAmount,
           pool.currency

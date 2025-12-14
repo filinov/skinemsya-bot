@@ -46,12 +46,12 @@ export const buildOwnerPoolView = async (pool, ctx) => {
 
 export const buildParticipantPoolView = (pool) => {
   const keyboard = new InlineKeyboard()
-    .text("Перевел по реквизитам", `pay:${pool.id}:transfer`)
+    .text("💳 Перевел(а)", `pay:${pool.id}:transfer`)
     .row()
-    .text("Отдал наличкой", `pay:${pool.id}:cash`);
+    .text("💵 Отдал(а) лично", `pay:${pool.id}:cash`);
 
   return {
-    text: `${poolHeadline(pool)}\n\nПодтвердите свой взнос нажав на кнопку ниже, я сообщу об этом организатору.`,
+    text: `${poolHeadline(pool)}\n\n⚠️ <b>Важно:</b> Как только переведешь (или отдашь наличкой), отметься внизу, чтобы я передал информацию организатору. 👇`,
     keyboard
   };
 };

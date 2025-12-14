@@ -46,7 +46,7 @@ export const renderOwnerPool = async (ctx, pool) => {
   const keyboard = new InlineKeyboard();
 
   if (!pool.isClosed) {
-    keyboard.url("🔗 Поделиться сбором", shareUrl).row();
+    keyboard.url("📨 Пригласить участников", shareUrl).row();
     keyboard.text("💸 Отметить взнос", `pmenu:${pool.id}:1`).row();
   }
 
