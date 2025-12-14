@@ -2,7 +2,6 @@ import { Bot, GrammyError, HttpError } from "grammy";
 import { conversations, createConversation } from "@grammyjs/conversations";
 import { connectToMongoDB, disconnectFromMongoDB } from "./config/mongo.js";
 import setupSession from "./middlewares/session.js";
-import redis from "./config/redis.js";
 import logger from "./utils/logger.js";
 import env from "./config/env.js";
 import userContext from "./middlewares/userContext.js";
@@ -67,7 +66,7 @@ const bootstrap = async () => {
     }
   });
 
-  bot.use(setupSession(redis));
+  bot.use(setupSession());
   bot.use(conversations());
   bot.use(createConversation(createPoolConversation, "createPool"));
   bot.use(userContext);
@@ -83,6 +82,5 @@ const bootstrap = async () => {
 bootstrap().catch((err) => {
   logger.error({ err }, "❌ Fatal error during bootstrap");
   disconnectFromMongoDB();
-  redis.disconnect();
   process.exit(1);
 });

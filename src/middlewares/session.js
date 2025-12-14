@@ -1,61 +1,44 @@
-import { MemorySessionStorage, session } from "grammy";
-import { RedisAdapter } from "@grammyjs/storage-redis";
+import { session } from "grammy";
+import SessionModel from "../models/Session.js";
 import logger from "../utils/logger.js";
 
-export default (redis) => {
-  const memoryStorage = new MemorySessionStorage();
-  let redisStorage =
-    redis &&
-    new RedisAdapter({
-      instance: redis,
-      prefix: "tg:sess:"
-    });
-
-  let redisHealthy = Boolean(redisStorage);
-
-  const fallbackToMemory = (error, action) => {
-    if (redisHealthy) {
-      logger.warn({ err: error }, `Redis session ${action} failed, fallback to memory session`);
+class MongoSessionStorage {
+  async read(key) {
+    try {
+      const record = await SessionModel.findOne({ key }).lean();
+      return record?.data;
+    } catch (error) {
+      logger.error({ err: error, key }, "Failed to read session from MongoDB");
+      throw error;
     }
-    redisHealthy = false;
-  };
+  }
 
-  const storage = {
-    read: async (key) => {
-      if (redisHealthy) {
-        try {
-          return await redisStorage.read(key);
-        } catch (error) {
-          fallbackToMemory(error, "read");
-        }
-      }
-      return memoryStorage.read(key);
-    },
-    write: async (key, value) => {
-      if (redisHealthy) {
-        try {
-          return await redisStorage.write(key, value);
-        } catch (error) {
-          fallbackToMemory(error, "write");
-        }
-      }
-      return memoryStorage.write(key, value);
-    },
-    delete: async (key) => {
-      if (redisHealthy) {
-        try {
-          return await redisStorage.delete(key);
-        } catch (error) {
-          fallbackToMemory(error, "delete");
-        }
-      }
-      return memoryStorage.delete(key);
+  async write(key, value) {
+    try {
+      await SessionModel.findOneAndUpdate(
+        { key },
+        { data: value },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    } catch (error) {
+      logger.error({ err: error, key }, "Failed to write session to MongoDB");
+      throw error;
     }
-  };
+  }
 
-  return session({
+  async delete(key) {
+    try {
+      await SessionModel.deleteOne({ key });
+    } catch (error) {
+      logger.error({ err: error, key }, "Failed to delete session from MongoDB");
+      throw error;
+    }
+  }
+}
+
+export default () =>
+  session({
     initial: () => ({}),
-    storage,
+    storage: new MongoSessionStorage(),
     getSessionKey: (ctx) => (ctx.from ? String(ctx.from.id) : undefined)
   });
-};
