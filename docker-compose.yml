@@ -9,6 +9,3 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: example
     volumes:
       - mongo_data:/data/db
-
-volumes:
-  mongo_data
