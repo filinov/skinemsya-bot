@@ -29,6 +29,7 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
     ports:
+      []
       # В продакшене лучше не открывать порт наружу
       # - '27017:27017' # Закомментировать для продакшена
     expose:
