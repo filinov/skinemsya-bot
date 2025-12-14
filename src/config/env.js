@@ -43,7 +43,7 @@ const env = {
   host: process.env.HOST || "0.0.0.0",
 
   // Флаги
-  enableWebhook: parseBool(process.env.ENABLE_WEBHOOK, isProduction),
+  enableWebhook: parseBool(process.env.ENABLE_WEBHOOK, false),
 
   // Админ ID
   botAdminId: process.env.BOT_ADMIN_ID ? parseIntSafe(process.env.BOT_ADMIN_ID) : null,
