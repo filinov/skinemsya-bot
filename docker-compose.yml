@@ -14,9 +14,6 @@ services:
       - '27017:27017' # Закомментировать для продакшена
     expose:
       - 27017
-    volumes:
-      - mongo_data:/data/db
-      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - app-network
     healthcheck:
