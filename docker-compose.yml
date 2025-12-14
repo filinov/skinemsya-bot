@@ -49,8 +49,8 @@ services:
     #   retries: 3
     #   start_period: 40s
 
-# networks:
-#   app-network:
+networks:
+  app-network:
 
-# volumes:
-#   mongo_data:
+volumes:
+  mongo_data:
