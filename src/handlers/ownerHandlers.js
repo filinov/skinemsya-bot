@@ -40,23 +40,16 @@ const findOwnerParticipant = (pool, owner) => {
 const findParticipantById = (pool, participantId) =>
   pool.participants.find((participant) => participant.id === participantId);
 
-const buildOwnerKeyboard = (pool) => {
+export const renderOwnerPool = async (ctx, pool) => {
+  const { text, shareUrl } = await buildOwnerPoolView(pool, ctx);
+
   const keyboard = new InlineKeyboard();
 
   if (!pool.isClosed) {
+    keyboard.url("🔗 Поделиться сбором", shareUrl).row();
     keyboard.text("💸 Отметить взнос", `pmenu:${pool.id}:1`).row();
   }
 
-  return keyboard;
-};
-
-const renderOwnerPool = async (ctx, pool) => {
-  const keyboard = buildOwnerKeyboard(pool);
-  const { text, shareUrl } = await buildOwnerPoolView(pool, ctx);
-
-  if (!pool.isClosed) {
-    keyboard.row().url("🔗 Поделиться сбором", shareUrl);
-  }
   const toggleLabel = pool.isClosed ? "🔓 Открыть сбор" : "⛔️ Закрыть сбор";
   keyboard.row().text(toggleLabel, `${pool.isClosed ? "open" : "close"}:${pool.id}`);
   keyboard.row().text("⬅️ К списку", "action:pools");

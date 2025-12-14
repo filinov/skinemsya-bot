@@ -4,7 +4,8 @@ import { upsertUserFromTelegram, getDisplayName } from "../services/userService.
 import { escapeHtml, formatAmount } from "../utils/text.js";
 import logger from "../utils/logger.js";
 import { sendMainMenu } from "../handlers/menuHandlers.js";
-import { buildOwnerPoolView, buildParticipantPoolView } from "../presenters/poolPresenter.js";
+import { renderOwnerPool } from "../handlers/ownerHandlers.js";
+import { buildParticipantPoolView } from "../presenters/poolPresenter.js";
 
 const askForTitle = async (conversation, ctx) => {
   await ctx.reply("🎯 <b>На что собираем?</b>\nНапример, «День рождения Виктора».", { parse_mode: "HTML" });
@@ -196,8 +197,6 @@ export const createPoolConversation = async (conversation, ctx) => {
     expectedParticipantsCount
   });
 
-  const { text, shareUrl } = await buildOwnerPoolView(pool, ctx);
-
   if (selectedParticipants.length) {
     const shareAmount =
       pool.amountType === "per_person"
@@ -226,12 +225,5 @@ export const createPoolConversation = async (conversation, ctx) => {
     }
   }
 
-  const keyboard = new InlineKeyboard()
-    .url("🔗 Поделиться сбором", shareUrl)
-    .row()
-    .text("💸 Отметить взнос", `pmenu:${pool.id}:1`)
-    .row()
-    .text("⬅️ К списку", "action:pools");
-
-  await ctx.reply(text, { parse_mode: "HTML", reply_markup: keyboard, disable_web_page_preview: true });
+  await renderOwnerPool(ctx, pool);
 };
