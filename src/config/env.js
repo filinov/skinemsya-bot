@@ -28,7 +28,7 @@ const env = {
   botToken: process.env.BOT_TOKEN,
 
   // База данных
-  databaseUrl: process.env.DATABASE_URL || (isProduction ? null : "file:./data/bot.db"),
+  databaseUrl: process.env.DATABASE_URL || "file:./data/bot.db",
 
   // Логирование
   logLevel: process.env.LOG_LEVEL || (isProduction ? "info" : "debug"),
