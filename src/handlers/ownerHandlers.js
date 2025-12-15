@@ -15,8 +15,8 @@ import { escapeHtml } from "../utils/text.js";
 import { decodeInlineId, encodeInlineId } from "../utils/idCodec.js";
 import logger from "../utils/logger.js";
 
-const POOLS_PAGE_SIZE = 6;
-const PAYMENT_MENU_PAGE_SIZE = 6;
+const POOLS_PAGE_SIZE = 10;
+const PAYMENT_MENU_PAGE_SIZE = 10;
 
 const normalizePaymentMode = (mode) => {
   if (mode === "c" || mode === "confirm") return "confirm";
@@ -125,9 +125,9 @@ const buildPaymentMenu = (pool, page = 1, owner) => {
     const hasPrev = currentPage > 1;
     const hasNext = currentPage < totalPages;
     const navRow = new InlineKeyboard();
-    if (hasPrev) navRow.text("◀️", `pmenu:${encodeInlineId(pool.id)}:${currentPage - 1}`);
-    navRow.text(`Стр. ${currentPage}/${totalPages}`, "noop");
-    if (hasNext) navRow.text("▶️", `pmenu:${encodeInlineId(pool.id)}:${currentPage + 1}`);
+    navRow.text("◀️", hasPrev ? `pmenu:${encodeInlineId(pool.id)}:${currentPage - 1}` : "noop");
+    navRow.text(`${currentPage} из ${totalPages}`, "noop");
+    navRow.text("▶️", hasNext ? `pmenu:${encodeInlineId(pool.id)}:${currentPage + 1}` : "noop");
     keyboard.inline_keyboard.push(navRow.inline_keyboard[0]);
   }
 
@@ -184,8 +184,7 @@ export const sendOwnerPools = async (ctx, page = 1) => {
 
   if (!pools.length) {
     const keyboard = new InlineKeyboard()
-      .text("➕ Создать сбор", "action:new")
-      .row()
+      .text("➕ Создать сбор", "action:new").row()
       .text("⬅️ В меню", "action:menu");
 
     await replyOrEdit(
@@ -411,17 +410,6 @@ export const setFullPaymentAmount = async (ctx) => {
   if (mode === "confirm" || mode === "manual") {
     await notifyPaymentConfirmed({ ctx, pool: updatedPool, participantId, owner });
   }
-};
-
-export const requestCustomPaymentAmount = async (ctx) => {
-  await ctx.answerCallbackQuery({ text: "Произвольные суммы отключены", show_alert: true });
-};
-
-export const handlePaymentAmountInput = async (ctx, next) => {
-  const pending = ctx.session?.pendingPaymentAmount;
-  if (!pending) return next();
-  ctx.session.pendingPaymentAmount = null;
-  await ctx.reply("Произвольные суммы отключены. Используй фиксированную сумму в меню взносов.");
 };
 
 export const confirmPayment = async (ctx) => {

@@ -4,7 +4,6 @@ import {
   closePool,
   confirmPayment,
   confirmPaymentFromMenu,
-  handlePaymentAmountInput,
   manualConfirmPayment,
   manualConfirmPaymentFromMenu,
   openPool,
@@ -21,35 +20,37 @@ import { handlePay, handleStart } from "../handlers/participantHandlers.js";
 
 const composer = new Composer();
 
+// Команда /start
 composer.command("start", handleStart);
 
+// Создание нового сбора
 composer.command("new", (ctx) => ctx.conversation.enter("createPool"));
-composer.hears("Создать сбор", (ctx) => ctx.conversation.enter("createPool"));
-composer.hears("➕ Создать сбор", (ctx) => ctx.conversation.enter("createPool"));
 composer.callbackQuery("action:new", async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.conversation.enter("createPool");
 });
 
+// Мои сборы
 composer.command("pools", sendOwnerPools);
-composer.hears("Мои сборы", sendOwnerPools);
-composer.hears("📂 Мои сборы", sendOwnerPools);
 composer.callbackQuery("action:pools", async (ctx) => {
   await ctx.answerCallbackQuery();
   await sendOwnerPools(ctx);
 });
+
+// Пагинация в списке сборов
 composer.callbackQuery(/^pools:page:(\d+)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await sendOwnerPools(ctx, Number(ctx.match[1]));
 });
 
+// Помощь
 composer.command("help", sendHelp);
-composer.hears("Помощь", sendHelp);
-composer.hears("❔ Помощь", sendHelp);
 composer.callbackQuery("action:help", async (ctx) => {
   await ctx.answerCallbackQuery();
   await sendHelp(ctx);
 });
+
+// Главное меню
 composer.callbackQuery("action:menu", async (ctx) => {
   await ctx.answerCallbackQuery();
   await sendMainMenu(ctx);
@@ -78,6 +79,5 @@ composer.callbackQuery(new RegExp(`^pmm:${poolIdPattern}:${poolIdPattern}:(\\d+)
 composer.callbackQuery(new RegExp(`^selfpay:${poolIdPattern}:(\\d+)$`), selfConfirmPayment);
 composer.callbackQuery(new RegExp(`^pamount:${poolIdPattern}:${poolIdPattern}:(\\d+):(confirm|manual|c|m)$`), setFullPaymentAmount);
 composer.callbackQuery(new RegExp(`^pafull:${poolIdPattern}:${poolIdPattern}:(\\d+):(confirm|manual|c|m)$`), setFullPaymentAmount);
-composer.on("message:text", handlePaymentAmountInput);
 
 export default composer;

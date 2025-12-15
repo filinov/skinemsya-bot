@@ -50,8 +50,6 @@ const initializeMiddlewares = (bot) => {
 };
 
 const startPolling = async (bot) => {
-  const botInfo = await bot.api.getMe();
-
   await bot.start({
     onStart: (botInfo) => {
       logger.info(`🤖 Bot @${botInfo.username} started successfully`);

@@ -22,8 +22,7 @@ const askForTitle = async (conversation, ctx) => {
 
 const askAmountType = async (conversation, ctx) => {
   const keyboard = new InlineKeyboard()
-    .text("Всего", "amount_total")
-    .row()
+    .text("Всего", "amount_total").row()
     .text("С каждого", "amount_per_person");
 
   await ctx.reply("💰 <b>Нужно собрать</b>", {
@@ -41,8 +40,8 @@ const askAmountType = async (conversation, ctx) => {
 const askAmountValue = async (conversation, ctx, amountType, hints) => {
   const hint =
     amountType === "total"
-      ? `<b>Какую общую сумму нужно собрать?</b>\nОтправь число, можно с копейками через точку.`
-      : `<b>Сколько должен внести каждый участник в рублях?</b>\nОтправь число, можно с копейками через точку.`;
+      ? `<b>Какую общую сумму нужно собрать?</b>\nОтправь число, например 1000.`
+      : `<b>Сколько должен внести каждый участник в рублях?</b>\nОтправь число, например 100.`;
 
   const suggestions = amountType === "total" ? (hints?.totalAmounts ?? []).slice(0, 4) : (hints?.perPersonAmounts ?? []).slice(0, 4);
   const keyboard =
@@ -93,7 +92,7 @@ const askPaymentDetails = async (conversation, ctx, hints) => {
         }, new InlineKeyboard())
       : undefined;
 
-  await ctx.reply("🏦 <b>Укажи реквизиты</b>\nКуда переводить деньги (номер карты, телефон, ссылка и т.п.).", {
+  await ctx.reply(`🏦 <b>Укажи реквизиты</b>\nКуда переводить деньги, например "Сбер +79991234567."`, {
     parse_mode: "HTML",
     reply_markup: keyboard
   });
@@ -140,9 +139,7 @@ const askParticipants = async (conversation, ctx, knownParticipants, owner) => {
   const skipKeyboard = new InlineKeyboard().text("Пропустить", "skip_known_participants");
 
   await ctx.reply(
-    `👥 <b>Кого из участников прошлых сборов позвать?</b>\nОтправь порядковые номера через запятую.\n\n${escapeHtml(
-      list
-    )}`,
+    `👥 <b>Кого из участников прошлых сборов позвать?</b>\nОтправь порядковые номера через запятую. Или нажми "Пропустить".\n\n${escapeHtml(list)}`,
     { parse_mode: "HTML", reply_markup: skipKeyboard }
   );
 
@@ -158,7 +155,6 @@ const askParticipants = async (conversation, ctx, knownParticipants, owner) => {
     if (!message?.text) continue;
 
     const text = message.text.trim();
-    if (text === "-" || text === "—") return [];
 
     const numbers = text
       .split(/[,\s]+/)
@@ -172,14 +168,12 @@ const askParticipants = async (conversation, ctx, knownParticipants, owner) => {
 
     if (selected.length) return selected;
 
-    await ctx.reply("⚠️ Не нашел таких номеров. Попробуй еще раз или напиши «-», чтобы пропустить.", {
-      parse_mode: "HTML"
-    });
+    await ctx.reply("⚠️ Не нашел таких номеров. Попробуй еще раз или нажми \"Пропустить\".", { parse_mode: "HTML" });
   }
 };
 
 const askExpectedCount = async (conversation, ctx) => {
-  await ctx.reply("👥 Сколько участников планируешь пригласить? Отправь число.", { parse_mode: "HTML" });
+  await ctx.reply("👥 <b>Сколько участников планируешь пригласить?</b> Отправь число, сумма поделиться между участниками.", { parse_mode: "HTML" });
   while (true) {
     const { message } = await conversation.waitFor("message:text");
     const value = Number(message.text.trim());
@@ -191,7 +185,11 @@ const askExpectedCount = async (conversation, ctx) => {
 };
 
 const askConfirmation = async (conversation, ctx, summary) => {
-  const keyboard = new InlineKeyboard().text("Создать", "confirm_create").text("Отмена", "cancel_create");
+  const keyboard = new InlineKeyboard();
+
+  keyboard.text("Создать", "confirm_create")
+          .text("Отмена", "cancel_create");
+
   await ctx.reply(summary, { reply_markup: keyboard, parse_mode: "HTML", disable_web_page_preview: true });
   const query = await conversation.waitForCallbackQuery(/confirm_create|cancel_create/);
   await query.answerCallbackQuery();
@@ -203,12 +201,12 @@ export const createPoolConversation = async (conversation, ctx) => {
   const upsertResult = await upsertUserFromTelegram(ctx.from);
   const owner = upsertResult?.user;
   if (!owner) {
-    await ctx.reply("Не могу получить данные пользователя. Попробуй еще раз.");
+    await ctx.reply("⚠️ Не могу получить данные пользователя. Попробуй еще раз.");
     return;
   }
 
   const title = await askForTitle(conversation, ctx);
-  const hints = await getOwnerPoolHints(owner.id);
+  const hints = getOwnerPoolHints(owner.id);
   const amountType = await askAmountType(conversation, ctx);
   const amountValue = await askAmountValue(conversation, ctx, amountType, hints);
   const paymentDetails = await askPaymentDetails(conversation, ctx, hints);
@@ -221,16 +219,14 @@ export const createPoolConversation = async (conversation, ctx) => {
 
   const shareText =
     amountType === "per_person"
-      ? `💳 <b>С каждого:</b> ${formatAmount(amountValue)}`
+      ? `💰 <b>С каждого:</b> ${formatAmount(amountValue)}`
       : `🎯 <b>Общая сумма:</b> ${formatAmount(amountValue)}\n💰 <b>Взнос с человека:</b> ${formatAmount(
           Math.ceil(amountValue / expectedParticipantsCount)
         )}`;
 
-  const summary = `👀 <b>Проверь детали сбора</b>\n\n🎁 <b>Название:</b> ${escapeHtml(
-    title
-  )}\n${shareText}\n🏦 <b>Реквизиты:</b> ${formatPaymentDetails(
-    paymentDetails
-  )}\n👥 <b>Участников в списке:</b> ${selectedParticipants.length}`;
+  const summary = `👀 <b>Проверь детали сбора</b>\n\n🎁 <b>Название:</b> ${escapeHtml(title)}\n
+                  ${shareText}\n🏦 <b>Реквизиты:</b> ${formatPaymentDetails(paymentDetails)}\n
+                  👥 <b>Участников в списке:</b> ${selectedParticipants.length}`;
 
   const confirmed = await askConfirmation(conversation, ctx, summary);
   if (!confirmed) {

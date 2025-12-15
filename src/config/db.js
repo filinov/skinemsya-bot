@@ -22,7 +22,6 @@ const ensureDatabaseFile = () => {
 };
 
 const applyMigrations = () => {
-  // Lightweight inline migrations (idempotent CREATE IF NOT EXISTS)
   sqlite.exec(`
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS users (
@@ -92,7 +91,7 @@ export const connectToDatabase = async () => {
     sqlite = new Database(filePath || ":memory:");
     applyMigrations();
     db = drizzle(sqlite);
-    logger.info({ url: env.databaseUrl }, "✅ Connected to SQLite via Drizzle");
+    logger.info({ url: env.databaseUrl }, "✅ Connected to SQLite database");
     return db;
   } catch (error) {
     logger.error({ err: error }, "❌ Error connecting to SQLite");
