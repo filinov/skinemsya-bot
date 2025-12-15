@@ -55,6 +55,11 @@ composer.callbackQuery("action:menu", async (ctx) => {
   await sendMainMenu(ctx);
 });
 
+// Fallback for stale confirmation buttons in create flow
+composer.callbackQuery(/^(confirm_create|cancel_create)$/, async (ctx) => {
+  await ctx.answerCallbackQuery({ text: "Что-то пошло не так. Начни создание заново.", show_alert: true });
+});
+
 composer.callbackQuery("noop", (ctx) => ctx.answerCallbackQuery());
 
 const poolIdPattern = "([a-zA-Z0-9_-]+)";
