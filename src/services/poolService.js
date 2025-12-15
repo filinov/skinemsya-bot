@@ -136,7 +136,7 @@ const collectTopValues = (items = [], limit = 5) => {
     .map((entry) => entry.value);
 };
 
-export const getOwnerPoolHints = (ownerId, { limit = 5 } = {}) => {
+export const getOwnerPoolHints = (ownerId, { limit = 10 } = {}) => {
   const db = getDb();
   const rows = db
     .select()

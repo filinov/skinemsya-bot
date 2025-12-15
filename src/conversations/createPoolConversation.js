@@ -44,7 +44,7 @@ const askAmountValue = async (conversation, ctx, amountType, hints) => {
       ? `<b>Какую общую сумму нужно собрать?</b>\nОтправь число, можно с копейками через точку.`
       : `<b>Сколько должен внести каждый участник в рублях?</b>\nОтправь число, можно с копейками через точку.`;
 
-  const suggestions = amountType === "total" ? hints?.totalAmounts ?? [] : hints?.perPersonAmounts ?? [];
+  const suggestions = amountType === "total" ? (hints?.totalAmounts ?? []).slice(0, 4) : (hints?.perPersonAmounts ?? []).slice(0, 4);
   const keyboard =
     suggestions.length > 0
       ? suggestions.slice(0, 5).reduce((kb, value, idx) => {
@@ -85,7 +85,7 @@ const askPaymentDetails = async (conversation, ctx, hints) => {
   const suggestions = hints?.paymentDetails ?? [];
   const keyboard =
     suggestions.length > 0
-      ? suggestions.slice(0, 5).reduce((kb, value, idx) => {
+      ? suggestions.slice(0, 2).reduce((kb, value, idx) => {
           const compact = value.replace(/\s+/g, " ").trim();
           const label = compact.length > 20 ? `${compact.slice(0, 18)}…` : compact;
           if (idx > 0) kb = kb.row();
