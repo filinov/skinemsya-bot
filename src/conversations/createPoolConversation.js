@@ -224,9 +224,7 @@ export const createPoolConversation = async (conversation, ctx) => {
           Math.ceil(amountValue / expectedParticipantsCount)
         )}`;
 
-  const summary = `👀 <b>Проверь детали сбора</b>\n\n🎁 <b>Название:</b> ${escapeHtml(title)}\n
-                  ${shareText}\n🏦 <b>Реквизиты:</b> ${formatPaymentDetails(paymentDetails)}\n
-                  👥 <b>Участников в списке:</b> ${selectedParticipants.length}`;
+  const summary = `👀 <b>Проверь детали сбора</b>\n\n🎁 <b>Название:</b> ${escapeHtml(title)}\n${shareText}\n🏦 <b>Реквизиты:</b> ${formatPaymentDetails(paymentDetails)}\n👥 <b>Участников в списке:</b> ${selectedParticipants.length}`;
 
   const confirmed = await askConfirmation(conversation, ctx, summary);
   if (!confirmed) {
