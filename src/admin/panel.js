@@ -216,12 +216,7 @@ const renderAdminPage = ({ stats, pools, users }) => `
       ${renderCard("Участников всего", stats.participants.total)}
       ${renderCard("Оплат подтверждено", stats.participants.confirmed)}
       ${renderCard("Отмечено к проверке", stats.participants.marked)}
-      ${renderCard(
-        "Собрано",
-        formatAmount(stats.money.paidTotal),
-        true,
-        \`Цель: \${formatAmount(stats.money.targetTotal)} · Прогресс: \${stats.money.completionPercent}%\`
-      )}
+      ${renderCard("Собрано", formatAmount(stats.money.paidTotal), true, `Цель: ${formatAmount(stats.money.targetTotal)} · Прогресс: ${stats.money.completionPercent}%`)}     )}
     </div>
 
     <div class="grid-two section">
