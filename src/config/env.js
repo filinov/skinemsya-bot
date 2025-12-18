@@ -47,6 +47,12 @@ const env = {
 
   // Админ ID
   botAdminId: process.env.BOT_ADMIN_ID ? parseIntSafe(process.env.BOT_ADMIN_ID) : null,
+
+  // Админ-панель
+  adminLogin: process.env.ADMIN_LOGIN,
+  adminPassword: process.env.ADMIN_PASSWORD,
+  adminEnabled: parseBool(process.env.ADMIN_ENABLED, Boolean(process.env.ADMIN_LOGIN && process.env.ADMIN_PASSWORD)),
+  adminPort: parseIntSafe(process.env.ADMIN_PORT, parseIntSafe(process.env.PORT, 3000))
 };
 
 const errors = [];

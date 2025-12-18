@@ -8,6 +8,8 @@ import userContext from "./middlewares/userContext.js";
 import rootComposer from "./composers/root.js";
 import { setupBotErrorHandling } from "./handlers/errorHandler.js";
 import { createPoolConversation } from "./conversations/createPoolConversation.js";
+import { attachAdminPanel } from "./admin/panel.js";
+import startAdminServer from "./admin/server.js";
 
 let webhookServer = null;
 
@@ -89,6 +91,8 @@ const startWebhook = async (bot) => {
   app.use(helmet());
   app.use(express.json());
 
+  attachAdminPanel(app);
+
   app.get("/health", (req, res) => {
     res.json({
       status: "OK",
@@ -155,6 +159,7 @@ const bootstrap = async () => {
     await connectToDatabase();
 
     const bot = createBot();
+    let adminServer = null;
 
     await setupBotCommands(bot);
 
@@ -162,6 +167,7 @@ const bootstrap = async () => {
       await startWebhook(bot);
     } else {
       await startPolling(bot);
+      adminServer = await startAdminServer();
     }
 
     if (!env.enableWebhook) {
@@ -171,6 +177,9 @@ const bootstrap = async () => {
         try {
           bot.stop();
           await disconnectFromDatabase();
+          if (adminServer) {
+            adminServer.close(() => logger.info("Admin panel server stopped"));
+          }
           logger.info("Bot stopped gracefully");
           process.exit(0);
         } catch (error) {
