@@ -47,34 +47,39 @@ export const handleJoin = async (ctx, joinCode) => {
   }
 };
 
-export const handleDecline = async (ctx) => {
-  const payload = (ctx.match || "").trim(); // joinCode expected in match for simplicity or we can use poolId if we encoded it
-  // Wait, the invite button uses `decline:${pool.joinCode}`.
+export const handleDecline = async (ctx, joinCode) => {
+  try {
+    // If joinCode is passed, use it. Otherwise try to extract from match context if it's a string (though unlikely with regex callback)
+    const payload = (joinCode ?? (typeof ctx.match === 'string' ? ctx.match : "")).trim();
 
-  // Note: To decline securely we should verify the user is actually invited to this pool?
-  // Using joinCode to find pool is fine.
+    // Note: To decline securely we should verify the user is actually invited to this pool?
+    // Using joinCode to find pool is fine.
 
-  const pool = await getPoolByJoinCode(payload);
-  if (!pool) {
-    await ctx.answerCallbackQuery("Сбор не найден");
-    return;
+    const pool = await getPoolByJoinCode(payload);
+    if (!pool) {
+      await ctx.answerCallbackQuery("Сбор не найден");
+      return;
+    }
+
+    const { user } = (await ensureUserInContext(ctx)) || {};
+    if (!user) {
+      await ctx.answerCallbackQuery("Ошибка авторизации");
+      return;
+    }
+
+    // Call service to mark declined
+    // We need to import markParticipantDeclined
+    await markParticipantDeclined({ poolId: pool.id, userId: user.id });
+
+    await ctx.editMessageText(`❌ Вы отказались от участия в сборе <b>«${escapeHtml(pool.title)}»</b>.`, {
+      parse_mode: "HTML",
+      reply_markup: undefined // Remove buttons
+    });
+    await ctx.answerCallbackQuery("Вы отказались от участия");
+  } catch (error) {
+    logger.error({ error }, "Error in handleDecline");
+    await ctx.answerCallbackQuery("Произошла ошибка при отказе");
   }
-
-  const { user } = (await ensureUserInContext(ctx)) || {};
-  if (!user) {
-    await ctx.answerCallbackQuery("Ошибка авторизации");
-    return;
-  }
-
-  // Call service to mark declined
-  // We need to import markParticipantDeclined
-  await markParticipantDeclined({ poolId: pool.id, userId: user.id });
-
-  await ctx.editMessageText(`❌ Вы отказались от участия в сборе <b>«${escapeHtml(pool.title)}»</b>.`, {
-    parse_mode: "HTML",
-    reply_markup: undefined // Remove buttons
-  });
-  await ctx.answerCallbackQuery("Вы отказались от участия");
 };
 
 export const handlePay = async (ctx) => {
