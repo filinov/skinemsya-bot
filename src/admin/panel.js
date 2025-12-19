@@ -1,7 +1,7 @@
 import express from "express";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
-import { getRecentPools, getRecentUsers, getUsageStats, togglePoolState } from "./statsService.js";
+import { getRecentPools, getRecentUsers, getTimelineStats, getUsageStats, togglePoolState } from "./statsService.js";
 import { escapeHtml, formatAmount } from "../utils/text.js";
 
 const parseBasicAuth = (header) => {
@@ -45,7 +45,9 @@ const renderCard = (title, value, accent = false, hint = "") => `
   </div>
 `;
 
-const renderAdminPage = ({ stats, pools, users }) => `
+const safeJson = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
+
+const renderAdminPage = ({ stats, pools, users, timeline }) => `
 <!doctype html>
 <html lang="ru">
 <head>
@@ -54,15 +56,16 @@ const renderAdminPage = ({ stats, pools, users }) => `
   <title>Админка бота</title>
   <style>
     :root {
-      --bg: linear-gradient(135deg, #0f172a 0%, #1f2937 100%);
-      --panel: rgba(255, 255, 255, 0.04);
+      --bg: radial-gradient(circle at 10% 20%, rgba(96, 165, 250, 0.12), transparent 25%), radial-gradient(circle at 80% 10%, rgba(52, 211, 153, 0.16), transparent 25%), #0f172a;
+      --panel: rgba(255, 255, 255, 0.05);
       --border: rgba(255, 255, 255, 0.08);
-      --text: #e5e7eb;
+      --text: #f3f4f6;
       --muted: #9ca3af;
-      --accent: #60a5fa;
+      --accent: #38bdf8;
+      --accent-2: #a78bfa;
       --danger: #f87171;
       --success: #34d399;
-      --shadow: 0 15px 50px rgba(0, 0, 0, 0.25);
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
     }
     * { box-sizing: border-box; }
     body {
@@ -71,7 +74,7 @@ const renderAdminPage = ({ stats, pools, users }) => `
       font-family: "Manrope", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
-      padding: 32px 24px 48px;
+      padding: 32px 18px 56px;
     }
     .page {
       max-width: 1200px;
@@ -84,8 +87,8 @@ const renderAdminPage = ({ stats, pools, users }) => `
       margin-bottom: 24px;
     }
     .title {
-      font-size: 28px;
-      font-weight: 700;
+      font-size: 30px;
+      font-weight: 800;
       letter-spacing: -0.02em;
     }
     .badge {
@@ -98,19 +101,23 @@ const renderAdminPage = ({ stats, pools, users }) => `
     }
     .cards {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
     }
     .card {
       background: var(--panel);
       border: 1px solid var(--border);
-      padding: 16px;
-      border-radius: 14px;
+      padding: 16px 18px;
+      border-radius: 16px;
       box-shadow: var(--shadow);
     }
     .card--accent {
       border-color: rgba(96, 165, 250, 0.5);
       background: linear-gradient(145deg, rgba(96,165,250,0.12), rgba(59,130,246,0.05));
+    }
+    .card--accent-2 {
+      border-color: rgba(167, 139, 250, 0.5);
+      background: linear-gradient(145deg, rgba(167,139,250,0.14), rgba(99,102,241,0.07));
     }
     .card__title {
       font-size: 14px;
@@ -134,6 +141,13 @@ const renderAdminPage = ({ stats, pools, users }) => `
       box-shadow: var(--shadow);
       padding: 16px;
     }
+    .charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+    canvas { width: 100%; height: 320px; }
     .section__header {
       display: flex;
       align-items: center;
@@ -196,6 +210,30 @@ const renderAdminPage = ({ stats, pools, users }) => `
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 12px;
     }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .btn {
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(145deg, rgba(56, 189, 248, 0.14), rgba(59, 130, 246, 0.08));
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+    .btn.secondary {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .btn:hover { transform: translateY(-1px); }
+    @media (max-width: 720px) {
+      header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .toolbar { width: 100%; justify-content: flex-start; }
+      canvas { height: 260px; }
+    }
   </style>
 </head>
 <body>
@@ -203,20 +241,40 @@ const renderAdminPage = ({ stats, pools, users }) => `
     <header>
       <div>
         <div class="title">Админка бота</div>
-        <div class="muted">Управление и статистика использования</div>
+        <div class="muted">Живые графики и управление</div>
       </div>
-      <div class="pill">Обновлено: ${formatDate(stats.lastUpdated)}</div>
+      <div class="toolbar">
+        <div class="pill">Обновлено: ${formatDate(stats.lastUpdated)}</div>
+        <button class="btn secondary" onclick="location.reload()">Обновить</button>
+      </div>
     </header>
 
     <div class="cards">
-      ${renderCard("Пользователи", stats.users.total)}
-      ${renderCard("Активно за 24ч", stats.users.active24h)}
-      ${renderCard("Сборов активно", stats.pools.open)}
+      ${renderCard("Пользователи", stats.users.total, true)}
+      ${renderCard("Активно за 24ч", stats.users.active24h, false)}
+      ${renderCard("Сборов активно", stats.pools.open, true)}
       ${renderCard("Сборов закрыто", stats.pools.closed)}
-      ${renderCard("Участников всего", stats.participants.total)}
-      ${renderCard("Оплат подтверждено", stats.participants.confirmed)}
-      ${renderCard("Отмечено к проверке", stats.participants.marked)}
+      ${renderCard("Участников всего", stats.participants.total, false)}
+      ${renderCard("Оплат подтверждено", stats.participants.confirmed, true)}
+      ${renderCard("Отмечено к проверке", stats.participants.marked, false)}
       ${renderCard("Собрано", formatAmount(stats.money.paidTotal), true, `Цель: ${formatAmount(stats.money.targetTotal)} · Прогресс: ${stats.money.completionPercent}%`)}
+    </div>
+
+    <div class="section">
+      <div class="section__header">
+        <div class="section__title">Динамика</div>
+        <div class="pill">14 дней</div>
+      </div>
+      <div class="charts">
+        <div class="card">
+          <div class="card__title">Новые сборы и пользователи</div>
+          <canvas id="chart-activity"></canvas>
+        </div>
+        <div class="card card--accent-2">
+          <div class="card__title">Оплаты по дням</div>
+          <canvas id="chart-paid"></canvas>
+        </div>
+      </div>
     </div>
 
     <div class="grid-two section">

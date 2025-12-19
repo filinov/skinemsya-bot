@@ -1,4 +1,4 @@
-import { desc, eq, gte, sql } from "drizzle-orm";
+import { desc, eq, gte, inArray, sql } from "drizzle-orm";
 import getDb, { pools, poolParticipants, users } from "../config/db.js";
 import { getPoolById, setPoolClosed } from "../services/poolService.js";
 
@@ -136,4 +136,87 @@ export const togglePoolState = async (poolId) => {
   const pool = await getPoolById(poolId);
   if (!pool) return null;
   return setPoolClosed({ poolId, ownerId: pool.ownerId, isClosed: !pool.isClosed });
+};
+
+const buildTimelineBuckets = (days) => {
+  const buckets = [];
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const key = date.toISOString().slice(0, 10);
+    buckets.push({ key, label: date.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" }), value: 0 });
+  }
+  return buckets;
+};
+
+const fillCounts = (buckets, timestamps) => {
+  const map = new Map(buckets.map((b) => [b.key, b]));
+  timestamps.forEach((ts) => {
+    if (!ts) return;
+    const date = new Date(ts);
+    date.setHours(0, 0, 0, 0);
+    const key = date.toISOString().slice(0, 10);
+    const bucket = map.get(key);
+    if (bucket) bucket.value += 1;
+  });
+  return buckets;
+};
+
+const fillSums = (buckets, entries) => {
+  const map = new Map(buckets.map((b) => [b.key, b]));
+  entries.forEach(({ ts, amount }) => {
+    if (!ts || amount == null) return;
+    const date = new Date(ts);
+    date.setHours(0, 0, 0, 0);
+    const key = date.toISOString().slice(0, 10);
+    const bucket = map.get(key);
+    if (bucket) bucket.value += Number(amount) || 0;
+  });
+  return buckets;
+};
+
+export const getTimelineStats = (days = 14) => {
+  const db = getDb();
+  const from = new Date();
+  from.setHours(0, 0, 0, 0);
+  from.setDate(from.getDate() - (days - 1));
+
+  const poolsRows = db
+    .select({ createdAt: pools.createdAt })
+    .from(pools)
+    .where(gte(pools.createdAt, from))
+    .all();
+
+  const userRows = db
+    .select({ createdAt: users.createdAt })
+    .from(users)
+    .where(gte(users.createdAt, from))
+    .all();
+
+  const paidRows = db
+    .select({
+      paidAmount: poolParticipants.paidAmount,
+      status: poolParticipants.status,
+      confirmedAt: poolParticipants.confirmedAt,
+      markedAt: poolParticipants.markedAt,
+      createdAt: poolParticipants.createdAt
+    })
+    .from(poolParticipants)
+    .where(inArray(poolParticipants.status, ["confirmed", "marked_paid"]))
+    .all();
+
+  const poolBuckets = fillCounts(buildTimelineBuckets(days), poolsRows.map((r) => r.createdAt));
+  const userBuckets = fillCounts(buildTimelineBuckets(days), userRows.map((r) => r.createdAt));
+  const paidBuckets = fillSums(
+    buildTimelineBuckets(days),
+    paidRows.map((row) => ({ ts: row.confirmedAt || row.markedAt || row.createdAt, amount: row.paidAmount }))
+  );
+
+  return {
+    labels: poolBuckets.map((b) => b.label),
+    pools: poolBuckets.map((b) => b.value),
+    users: userBuckets.map((b) => b.value),
+    paid: paidBuckets.map((b) => Number(b.value.toFixed(2)))
+  };
 };
