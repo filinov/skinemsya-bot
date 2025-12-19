@@ -47,10 +47,10 @@ const askAmountValue = async (conversation, ctx, amountType, hints) => {
   const keyboard =
     suggestions.length > 0
       ? suggestions.slice(0, 5).reduce((kb, value, idx) => {
-          const label = formatAmount(value);
-          if (idx > 0 && idx % 2 === 0) kb = kb.row();
-          return kb.text(label, `amount_pick:${value}`);
-        }, new InlineKeyboard())
+        const label = formatAmount(value);
+        if (idx > 0 && idx % 2 === 0) kb = kb.row();
+        return kb.text(label, `amount_pick:${value}`);
+      }, new InlineKeyboard())
       : undefined;
 
   await ctx.reply(`💵 ${hint}`, { parse_mode: "HTML", reply_markup: keyboard });
@@ -85,11 +85,11 @@ const askPaymentDetails = async (conversation, ctx, hints) => {
   const keyboard =
     suggestions.length > 0
       ? suggestions.slice(0, 2).reduce((kb, value, idx) => {
-          const compact = value.replace(/\s+/g, " ").trim();
-          const label = compact.length > 20 ? `${compact.slice(0, 18)}…` : compact;
-          if (idx > 0) kb = kb.row();
-          return kb.text(label, `pdetails:${idx}`);
-        }, new InlineKeyboard())
+        const compact = value.replace(/\s+/g, " ").trim();
+        const label = compact.length > 20 ? `${compact.slice(0, 18)}…` : compact;
+        if (idx > 0) kb = kb.row();
+        return kb.text(label, `pdetails:${idx}`);
+      }, new InlineKeyboard())
       : undefined;
 
   await ctx.reply(`🏦 <b>Укажи реквизиты</b>\nКуда переводить деньги, например "Сбер +79991234567."`, {
@@ -188,13 +188,13 @@ const askConfirmation = async (conversation, ctx, summary) => {
   const keyboard = new InlineKeyboard();
 
   keyboard.text("Создать", "confirm_create")
-          .text("Отмена", "cancel_create");
+    .text("Отмена", "cancel_create");
 
   await ctx.reply(summary, { reply_markup: keyboard, parse_mode: "HTML", disable_web_page_preview: true });
   const query = await conversation.waitForCallbackQuery(/confirm_create|cancel_create/);
   await query.answerCallbackQuery();
   const data = query.callbackQuery.data;
-  return data === "confirm_create";
+  return { confirmed: data === "confirm_create", ctx: query };
 };
 
 export const createPoolConversation = async (conversation, ctx) => {
@@ -221,15 +221,16 @@ export const createPoolConversation = async (conversation, ctx) => {
     amountType === "per_person"
       ? `💰 <b>С каждого:</b> ${formatAmount(amountValue)}`
       : `🎯 <b>Общая сумма:</b> ${formatAmount(amountValue)}\n💰 <b>Взнос с человека:</b> ${formatAmount(
-          Math.ceil(amountValue / expectedParticipantsCount)
-        )}`;
+        Math.ceil(amountValue / expectedParticipantsCount)
+      )}`;
 
   const summary = `👀 <b>Проверь детали сбора</b>\n\n🎁 <b>Название:</b> ${escapeHtml(title)}\n${shareText}\n🏦 <b>Реквизиты:</b> ${formatPaymentDetails(paymentDetails)}\n👥 <b>Участников в списке:</b> ${selectedParticipants.length}`;
 
-  const confirmed = await askConfirmation(conversation, ctx, summary);
+  const { confirmed, ctx: confirmCtx } = await askConfirmation(conversation, ctx, summary);
+
   if (!confirmed) {
-    await ctx.reply("❌ Ты отменил создание сбора.", { parse_mode: "HTML" });
-    await sendMainMenu(ctx);
+    await confirmCtx.reply("❌ Ты отменил создание сбора.", { parse_mode: "HTML" });
+    await sendMainMenu(confirmCtx);
     return;
   }
 
@@ -247,10 +248,10 @@ export const createPoolConversation = async (conversation, ctx) => {
     });
   } catch (error) {
     logger.error({ error }, "Failed to create pool");
-    await ctx.reply("❌ Не получилось создать сбор. Попробуй еще раз позже или начни заново.", {
+    await confirmCtx.reply("❌ Не получилось создать сбор. Попробуй еще раз позже или начни заново.", {
       parse_mode: "HTML"
     });
-    await sendMainMenu(ctx);
+    await sendMainMenu(confirmCtx);
     return;
   }
 
@@ -269,7 +270,8 @@ export const createPoolConversation = async (conversation, ctx) => {
         pool = await ensureParticipant(pool, user, { shareAmount });
         if (isOwner || !user.telegramId) continue;
         const participantView = buildParticipantPoolView(pool);
-        await ctx.api.sendMessage(user.telegramId, participantView.text, {
+        // Using confirmCtx.api here is fine, but we can also use ctx.api as it's just the API instance
+        await confirmCtx.api.sendMessage(user.telegramId, participantView.text, {
           parse_mode: "HTML",
           reply_markup: participantView.keyboard,
           disable_web_page_preview: true
@@ -283,5 +285,6 @@ export const createPoolConversation = async (conversation, ctx) => {
     }
   }
 
-  await renderOwnerPool(ctx, pool);
+  // Use the context from the confirmation button specifically to allow editing that message
+  await renderOwnerPool(confirmCtx, pool);
 };
