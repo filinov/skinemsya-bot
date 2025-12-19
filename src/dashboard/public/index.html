@@ -10,6 +10,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
     rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -21,31 +22,45 @@
         <h1 class="header__title">Dashboard</h1>
         <div class="header__status" id="lastUpdated">loading...</div>
       </div>
-      <button class="btn btn--icon" onclick="app.refresh()" aria-label="Refresh"> Refresh </button>
+      <button class="btn btn--icon" onclick="app.refresh()" aria-label="Refresh">
+        <i class="ph ph-arrows-clockwise"></i> Refresh
+      </button>
     </header>
 
     <main class="dashboard">
       <!-- Stats Grid -->
       <section class="grid grid--stats">
         <div class="card stat-card">
-          <div class="stat-card__title">Пользователи</div>
-          <div class="stat-card__value" id="stat-users-total">-</div>
-          <div class="stat-card__trend" id="stat-users-active">Active: -</div>
-        </div>
-        <div class="card stat-card stat-card--accent">
-          <div class="stat-card__title">Сборы</div>
-          <div class="stat-card__value" id="stat-pools-total">-</div>
-          <div class="stat-card__trend" id="stat-pools-new">New 24h: -</div>
+          <div class="stat-card__icon"><i class="ph ph-users"></i></div>
+          <div class="stat-card__content">
+            <div class="stat-card__title">Пользователи</div>
+            <div class="stat-card__value" id="stat-users-total">-</div>
+            <div class="stat-card__trend" id="stat-users-active">Active: -</div>
+          </div>
         </div>
         <div class="card stat-card">
-          <div class="stat-card__title">Транзакции</div>
-          <div class="stat-card__value" id="stat-activity-transactions">-</div>
-          <div class="stat-card__trend" id="stat-activity-24h">24h: -</div>
+          <div class="stat-card__icon"><i class="ph ph-piggy-bank"></i></div>
+          <div class="stat-card__content">
+            <div class="stat-card__title">Сборы</div>
+            <div class="stat-card__value" id="stat-pools-total">-</div>
+            <div class="stat-card__trend" id="stat-pools-new">New 24h: -</div>
+          </div>
         </div>
         <div class="card stat-card">
-          <div class="stat-card__title">Участники</div>
-          <div class="stat-card__value" id="stat-participants-total">-</div>
-          <div class="stat-card__trend">In pools</div>
+          <div class="stat-card__icon"><i class="ph ph-arrows-left-right"></i></div>
+          <div class="stat-card__content">
+            <div class="stat-card__title">Транзакции</div>
+            <div class="stat-card__value" id="stat-activity-transactions">-</div>
+            <div class="stat-card__trend" id="stat-activity-24h">24h: -</div>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-card__icon"><i class="ph ph-users-three"></i></div>
+          <div class="stat-card__content">
+            <div class="stat-card__title">Участники</div>
+            <div class="stat-card__value" id="stat-participants-total">-</div>
+            <div class="stat-card__trend">In pools</div>
+          </div>
         </div>
       </section>
 
@@ -53,7 +68,7 @@
       <section class="grid grid--charts">
         <div class="card chart-card">
           <div class="card__header">
-            <h3>Удержание (DAU)</h3>
+            <h3><i class="ph ph-chart-line-up"></i> Удержание (DAU)</h3>
           </div>
           <div class="chart-container">
             <canvas id="chartUsers"></canvas>
@@ -61,7 +76,7 @@
         </div>
         <div class="card chart-card">
           <div class="card__header">
-            <h3>Создание сборов</h3>
+            <h3><i class="ph ph-chart-bar"></i> Создание сборов</h3>
           </div>
           <div class="chart-container">
             <canvas id="chartPools"></canvas>
@@ -74,7 +89,7 @@
         <!-- Recent Pools -->
         <div class="card table-card">
           <div class="card__header">
-            <h3>Последние сборы</h3>
+            <h3><i class="ph ph-list-dashes"></i> Последние сборы</h3>
           </div>
           <div class="table-responsive">
             <table class="table">
@@ -96,7 +111,7 @@
         <!-- Recent Users -->
         <div class="card table-card">
           <div class="card__header">
-            <h3>Новые пользователи</h3>
+            <h3><i class="ph ph-user-plus"></i> Новые пользователи</h3>
           </div>
           <div class="table-responsive">
             <table class="table">
