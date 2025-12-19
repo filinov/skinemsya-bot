@@ -15,7 +15,7 @@ export const attachAdminPanel = (app) => {
   }
 
   // 1. Mount API Router (Auth included inside)
-  app.use("/admin/api", apiRouter);
+  app.use("/dashboard/api", apiRouter);
 
   // 2. Serve Static Frontend (Protected)
   // We use a separate router for static assets to ensure auth checks run before serving files
@@ -23,7 +23,7 @@ export const attachAdminPanel = (app) => {
   staticRouter.use(requireAdminAuth);
   staticRouter.use(express.static(path.join(__dirname, "public")));
 
-  app.use("/admin", staticRouter);
+  app.use("/dashboard", staticRouter);
 
-  logger.info("Admin panel mounted at /admin");
+  logger.info("Dashboard mounted at /dashboard");
 };

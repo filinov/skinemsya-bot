@@ -150,10 +150,10 @@ const app = {
     async refresh() {
         try {
             const [statsData, poolsData, usersData, timelineData] = await Promise.all([
-                api.get('/admin/api/stats'),
-                api.get('/admin/api/pools'),
-                api.get('/admin/api/users'),
-                api.get('/admin/api/timeline')
+                api.get('/dashboard/api/stats'),
+                api.get('/dashboard/api/pools'),
+                api.get('/dashboard/api/users'),
+                api.get('/dashboard/api/timeline')
             ]);
 
             if (statsData.ok) render.stats(statsData.stats);
@@ -169,7 +169,7 @@ const app = {
     async togglePool(id) {
         if (!confirm('Change pool status?')) return;
         try {
-            await api.post(`/admin/api/pools/${id}/toggle`);
+            const res = await api.post(`/dashboard/api/pools/${id}/toggle`);
             await this.refresh();
         } catch (e) {
             alert('Failed to toggle pool');

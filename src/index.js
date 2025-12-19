@@ -8,8 +8,8 @@ import userContext from "./middlewares/userContext.js";
 import rootComposer from "./composers/root.js";
 import { setupBotErrorHandling } from "./handlers/errorHandler.js";
 import { createPoolConversation } from "./conversations/createPoolConversation.js";
-import { attachAdminPanel } from "./admin/panel.js";
-import startAdminServer from "./admin/server.js";
+import { attachAdminPanel } from "./dashboard/panel.js";
+import startAdminServer from "./dashboard/server.js";
 
 let webhookServer = null;
 
@@ -25,7 +25,7 @@ const setupBotCommands = async (bot) => {
     logger.info("✅ Bot commands updated successfully");
   } catch (error) {
     logger.warn({ error }, "❌ Failed to set bot commands");
-    
+
     if (error instanceof GrammyError && error.error_code === 401) {
       logger.error("Invalid bot token. Please check BOT_TOKEN in .env file");
     }
@@ -41,7 +41,7 @@ const initializeMiddlewares = (bot) => {
 
   bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;
-    
+
     if (text.startsWith("/")) {
       await ctx.reply(
         "Неизвестная команда. Используйте /help для списка доступных команд."
@@ -55,7 +55,7 @@ const startPolling = async (bot) => {
   await bot.start({
     onStart: (botInfo) => {
       logger.info(`🤖 Bot @${botInfo.username} started successfully`);
-      
+
       if (env.botAdminId && env.isProduction) {
         bot.api.sendMessage(
           env.botAdminId,
@@ -63,7 +63,7 @@ const startPolling = async (bot) => {
         ).catch(err => logger.warn("Failed to send startup message to admin"));
       }
     },
-    
+
     allowed_updates: ["message", "callback_query", "inline_query"],
     drop_pending_updates: env.isProduction,
     limit: 100,
@@ -73,7 +73,7 @@ const startPolling = async (bot) => {
 const startWebhook = async (bot) => {
   const botInfo = await bot.api.getMe();
   const webhookUrl = `${env.webhookDomain}${env.webhookPath || `/webhook/${env.botToken}`}`;
-  
+
   logger.info(`Setting up webhook for @${botInfo.username} to ${webhookUrl}`);
 
   await bot.api.setWebhook(webhookUrl, {
@@ -114,7 +114,7 @@ const startWebhook = async (bot) => {
   webhookServer = app.listen(port, host, () => {
     logger.info(`Webhook server listening on ${host}:${port}`);
     logger.info(`🤖 Bot @${botInfo.username} started successfully`);
-    
+
     if (env.botAdminId && env.isProduction) {
       bot.api.sendMessage(
         env.botAdminId,
@@ -130,7 +130,7 @@ const startWebhook = async (bot) => {
       logger.info("Webhook server closed");
       process.exit(0);
     });
-    
+
     setTimeout(() => {
       logger.error("Could not close connections in time, forcefully shutting down");
       process.exit(1);
@@ -139,7 +139,7 @@ const startWebhook = async (bot) => {
 
   process.on("SIGTERM", gracefulShutdown);
   process.on("SIGINT", gracefulShutdown);
-  
+
   return webhookServer;
 };
 
@@ -173,7 +173,7 @@ const bootstrap = async () => {
     if (!env.enableWebhook) {
       const gracefulShutdown = async () => {
         logger.info("Received shutdown signal, stopping bot...");
-        
+
         try {
           bot.stop();
           await disconnectFromDatabase();
@@ -187,7 +187,7 @@ const bootstrap = async () => {
           process.exit(1);
         }
       };
-      
+
       process.on("SIGTERM", gracefulShutdown);
       process.on("SIGINT", gracefulShutdown);
     }
@@ -196,7 +196,7 @@ const bootstrap = async () => {
       logger.error({ error }, "Uncaught Exception");
       setTimeout(() => process.exit(1), 1000);
     });
-    
+
     process.on("unhandledRejection", (reason, promise) => {
       logger.error({ reason, promise }, "Unhandled Rejection");
     });
