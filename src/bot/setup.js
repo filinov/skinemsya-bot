@@ -91,7 +91,7 @@ export const startWebhook = async (bot) => {
     app.use(helmet());
     app.use(express.json());
 
-    attachAdminPanel(app);
+    //attachAdminPanel(app);
 
     app.get("/health", (req, res) => {
         res.json({
