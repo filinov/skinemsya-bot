@@ -72,7 +72,7 @@ export const startPolling = async (bot) => {
 
 export const startWebhook = async (bot) => {
     const botInfo = await bot.api.getMe();
-    const webhookUrl = `${env.webhookDomain}${env.webhookPath || `/webhook/${env.botToken}`}`;
+    const webhookUrl = `${env.webhookDomain}/webhook/${env.botToken}`;
 
     logger.info(`Setting up webhook for @${botInfo.username} to ${webhookUrl}`);
 
@@ -102,7 +102,7 @@ export const startWebhook = async (bot) => {
         });
     });
 
-    app.post(env.webhookPath || `/webhook/${env.botToken}`, webhookCallback(bot, "express"));
+    app.post(`/webhook/${env.botToken}`, webhookCallback(bot, "express"));
 
     app.use((req, res) => {
         res.status(404).json({ error: "Not found" });

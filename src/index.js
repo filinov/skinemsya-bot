@@ -15,12 +15,10 @@ const bootstrap = async () => {
 
     await setupBotCommands(bot);
 
-    if (env.enableWebhook) {
+    if (env.webhookDomain) {
       await startWebhook(bot);
-      // adminServer = await startAdminServer();
     } else {
       await startPolling(bot);
-      // adminServer = await startAdminServer();
     }
 
     const gracefulShutdown = async () => {

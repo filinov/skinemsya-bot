@@ -7,12 +7,6 @@ const isDevelopment = nodeEnv === "development";
 
 dotenv.config();
 
-const parseBool = (value, defaultValue = false) => {
-  if (value === undefined || value === null) return defaultValue;
-  if (typeof value === "boolean") return value;
-  return value.toLowerCase() === "true";
-};
-
 const parseIntSafe = (value, defaultValue = 0) => {
   const parsed = parseInt(value, 10);
   return isNaN(parsed) ? defaultValue : parsed;
@@ -28,22 +22,18 @@ const env = {
   botToken: process.env.BOT_TOKEN,
 
   // База данных
-  databaseUrl: process.env.DATABASE_URL || "file:./data/bot.db",
+  databaseUrl: "file:./data/bot.db",
 
   // Логирование
   logLevel: process.env.LOG_LEVEL || (isProduction ? "info" : "debug"),
   logFile: process.env.LOG_FILE,
 
   // Вебхуки (для продакшена)
-  webhookDomain: process.env.WEBHOOK_DOMAIN,
-  webhookPath: process.env.WEBHOOK_PATH || `/webhook/${process.env.BOT_TOKEN}`,
+  webhookDomain: process.env.WEBHOOK_URL,
 
   // Настройки приложения
   port: parseIntSafe(process.env.PORT, 3000),
   host: process.env.HOST || "0.0.0.0",
-
-  // Флаги
-  enableWebhook: parseBool(process.env.ENABLE_WEBHOOK, false),
 
   // Админ ID
   botAdminId: process.env.BOT_ADMIN_ID ? parseIntSafe(process.env.BOT_ADMIN_ID) : null,
@@ -51,8 +41,7 @@ const env = {
   // Админ-панель
   adminLogin: process.env.ADMIN_LOGIN,
   adminPassword: process.env.ADMIN_PASSWORD,
-  adminEnabled: parseBool(process.env.ADMIN_ENABLED, Boolean(process.env.ADMIN_LOGIN && process.env.ADMIN_PASSWORD)),
-  adminPort: parseIntSafe(process.env.ADMIN_PORT, parseIntSafe(process.env.PORT, 3000))
+  adminEnabled: Boolean(process.env.ADMIN_LOGIN && process.env.ADMIN_PASSWORD),
 };
 
 const errors = [];
@@ -65,7 +54,7 @@ if (!env.databaseUrl) {
   errors.push("DATABASE_URL обязателен для подключения к базе данных");
 }
 
-if (isProduction && env.enableWebhook && !env.webhookDomain) {
+if (isProduction && !env.webhookDomain) {
   errors.push("WEBHOOK_DOMAIN обязателен при использовании вебхуков в production");
 }
 
