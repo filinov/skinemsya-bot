@@ -29,7 +29,7 @@ const env = {
   logFile: process.env.LOG_FILE,
 
   // Вебхуки (для продакшена)
-  webhookDomain: process.env.WEBHOOK_URL,
+  webhookDomain: process.env.DOMAIN,
 
   // Настройки приложения
   port: parseIntSafe(process.env.PORT, 3000),
@@ -55,7 +55,7 @@ if (!env.databaseUrl) {
 }
 
 if (isProduction && !env.webhookDomain) {
-  errors.push("WEBHOOK_DOMAIN обязателен при использовании вебхуков в production");
+  errors.push("DOMAIN обязателен при использовании вебхуков в production");
 }
 
 if (errors.length > 0) {
