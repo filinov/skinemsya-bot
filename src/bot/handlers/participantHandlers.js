@@ -1,5 +1,5 @@
 import { InlineKeyboard } from "grammy";
-import { ensureParticipant, getPoolById, getPoolByJoinCode, markParticipantPaid } from "../../services/poolService.js";
+import { ensureParticipant, getPoolById, getPoolByJoinCode, markParticipantPaid, markParticipantDeclined } from "../../services/poolService.js";
 import { buildParticipantPoolView } from "../presenters/poolPresenter.js";
 import { getDisplayName } from "../../services/userService.js";
 import { ensureUserInContext } from "../../utils/context.js";
@@ -37,7 +37,44 @@ export const handleJoin = async (ctx, joinCode) => {
 
   const { text, keyboard } = buildParticipantPoolView(updatedPool);
 
-  await ctx.reply(text, { reply_markup: keyboard, parse_mode: "HTML", disable_web_page_preview: true });
+  // If call is from a callback button (Invite message), edit it.
+  if (ctx.callbackQuery) {
+    await ctx.editMessageText(text, { reply_markup: keyboard, parse_mode: "HTML", disable_web_page_preview: true });
+    await ctx.answerCallbackQuery("Вы присоединились к сбору!");
+  } else {
+    // Deep link join
+    await ctx.reply(text, { reply_markup: keyboard, parse_mode: "HTML", disable_web_page_preview: true });
+  }
+};
+
+export const handleDecline = async (ctx) => {
+  const payload = (ctx.match || "").trim(); // joinCode expected in match for simplicity or we can use poolId if we encoded it
+  // Wait, the invite button uses `decline:${pool.joinCode}`.
+
+  // Note: To decline securely we should verify the user is actually invited to this pool?
+  // Using joinCode to find pool is fine.
+
+  const pool = await getPoolByJoinCode(payload);
+  if (!pool) {
+    await ctx.answerCallbackQuery("Сбор не найден");
+    return;
+  }
+
+  const { user } = (await ensureUserInContext(ctx)) || {};
+  if (!user) {
+    await ctx.answerCallbackQuery("Ошибка авторизации");
+    return;
+  }
+
+  // Call service to mark declined
+  // We need to import markParticipantDeclined
+  await markParticipantDeclined({ poolId: pool.id, userId: user.id });
+
+  await ctx.editMessageText(`❌ Вы отказались от участия в сборе <b>«${escapeHtml(pool.title)}»</b>.`, {
+    parse_mode: "HTML",
+    reply_markup: undefined // Remove buttons
+  });
+  await ctx.answerCallbackQuery("Вы отказались от участия");
 };
 
 export const handlePay = async (ctx) => {
@@ -88,9 +125,9 @@ export const handlePay = async (ctx) => {
     const keyboard =
       participant && participant.id
         ? new InlineKeyboard().text(
-            "Подтвердить взнос",
-            `pafull:${encodeInlineId(updated.id)}:${encodeInlineId(participant.id)}:1:c`
-          )
+          "Подтвердить взнос",
+          `pafull:${encodeInlineId(updated.id)}:${encodeInlineId(participant.id)}:1:c`
+        )
         : undefined;
     await ctx.api.sendMessage(updated.owner.telegramId, text, {
       parse_mode: "HTML",

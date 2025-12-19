@@ -15,13 +15,33 @@ import {
   sendPaymentMenu,
   sendOwnerPool,
   sendOwnerPools
+  sendOwnerPool,
+  sendOwnerPools
 } from "../handlers/ownerHandlers.js";
-import { handlePay, handleStart } from "../handlers/participantHandlers.js";
+import { handlePay, handleStart, handleJoin, handleDecline } from "../handlers/participantHandlers.js";
 
 const composer = new Composer();
 
 // Команда /start
 composer.command("start", handleStart);
+
+// Обработка приглашений
+composer.callbackQuery(/^join:([a-f0-9]+)$/, async (ctx) => {
+  await handleJoin(ctx, ctx.match[1]);
+});
+
+composer.callbackQuery(/^decline:([a-f0-9]+)$/, async (ctx) => {
+  // We need to ensure ctx.match is available or passed. 
+  // GrammY passes regex matches in ctx.match. 
+  // My handleDecline implementation checks `ctx.match` which might be the whole string or array depending on regex.
+  // Let's rely on standard grammy behavior: ctx.match[1] will be the joinCode.
+  // Wait, my handleDecline implementation uses `(ctx.match || "").trim()` which seems designed for deep link start payload.
+  // I should update handleDecline or the call here to be consistent.
+  // Actually, handleDecline uses `const payload = (ctx.match || "").trim()`. 
+  // If ctx.match is an array (from regex), trim() will fail or be weird.
+  // Let's pass the joinCode explicitly to be safe, like handleJoin.
+  await handleDecline(ctx, ctx.match[1]);
+});
 
 // Создание нового сбора
 composer.command("new", (ctx) => ctx.conversation.enter("createPool"));

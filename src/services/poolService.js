@@ -207,6 +207,28 @@ export const ensureParticipant = async (pool, user, opts = {}) => {
   return loadPoolById(pool.id);
 };
 
+export const markParticipantDeclined = async ({ poolId, userId }) => {
+  const db = getDb();
+  const pool = await getPoolById(poolId);
+  if (!pool) return null;
+
+  const participant = pool.participants.find((p) => p.userId === userId);
+  if (!participant) return null;
+  // If already confirmed or paid, maybe don't allow decline? Or allow override?
+  // Let's allow declining unless confirmed (paid & confirmed by owner).
+  if (participant.status === "confirmed") return pool;
+
+  db.update(poolParticipants)
+    .set({
+      status: "declined",
+      updatedAt: new Date()
+    })
+    .where(eq(poolParticipants.id, participant.id))
+    .run();
+
+  return loadPoolById(pool.id);
+};
+
 export const markParticipantPaid = async ({ poolId, userId, payMethod = "transfer", note }) => {
   const db = getDb();
   const pool = await getPoolById(poolId);

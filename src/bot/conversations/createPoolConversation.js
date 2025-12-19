@@ -266,15 +266,28 @@ export const createPoolConversation = async (conversation, ctx) => {
       const participantId = user?.id;
       const isOwner = ownerId && participantId === ownerId;
       if (!user.telegramId && !isOwner) continue;
+
       try {
-        pool = await ensureParticipant(pool, user, { shareAmount });
-        if (isOwner || !user.telegramId) continue;
-        const participantView = buildParticipantPoolView(pool);
-        // Using confirmCtx.api here is fine, but we can also use ctx.api as it's just the API instance
-        await confirmCtx.api.sendMessage(user.telegramId, participantView.text, {
+        if (isOwner) {
+          // Owner is automatically joined/confirmed handled by createPool logic implicitly or explicitly later
+          // but createPool sets status='invited' for participants list passed to it.
+          // Actually createPool logic for `participants` arg sets them as 'invited'.
+          // For owner we usually want them auto-joined.
+          // But here, let's just ensure they are in the DB.
+          await ensureParticipant(pool, user, { shareAmount });
+          continue;
+        }
+
+        // For other participants, we DO NOT call ensureParticipant(status='joined') yet.
+        // We just send the invite. usage of createPool has already inserted them as 'invited'.
+
+        const inviteKeyboard = new InlineKeyboard()
+          .text("Присоединиться", `join:${pool.joinCode}`)
+          .text("Отказаться", `decline:${pool.joinCode}`);
+
+        await confirmCtx.api.sendMessage(user.telegramId, `👋 Вас пригласили в сбор <b>«${escapeHtml(pool.title)}»</b>.\n\n${shareText}`, {
           parse_mode: "HTML",
-          reply_markup: participantView.keyboard,
-          disable_web_page_preview: true
+          reply_markup: inviteKeyboard
         });
       } catch (error) {
         logger.warn(
