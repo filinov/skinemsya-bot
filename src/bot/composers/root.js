@@ -15,8 +15,6 @@ import {
   sendPaymentMenu,
   sendOwnerPool,
   sendOwnerPools
-  sendOwnerPool,
-  sendOwnerPools
 } from "../handlers/ownerHandlers.js";
 import { handlePay, handleStart, handleJoin, handleDecline } from "../handlers/participantHandlers.js";
 
