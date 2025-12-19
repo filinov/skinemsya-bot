@@ -8,8 +8,7 @@ import userContext from "./middlewares/userContext.js";
 import rootComposer from "./composers/root.js";
 import { setupBotErrorHandling } from "./handlers/errorHandler.js";
 import { createPoolConversation } from "./conversations/createPoolConversation.js";
-// import { attachAdminPanel } from "../dashboard/panel.js";
-// import startAdminServer from "../dashboard/server.js";
+import { attachAdminPanel } from "../dashboard/panel.js";
 
 let webhookServer = null;
 
@@ -79,7 +78,6 @@ export const startWebhook = async (bot) => {
     await bot.api.setWebhook(webhookUrl, {
         allowed_updates: ["message", "callback_query"],
         drop_pending_updates: true,
-        secret_token: env.webhookSecret,
     });
 
     const { default: express } = await import("express");
@@ -91,7 +89,7 @@ export const startWebhook = async (bot) => {
     app.use(helmet());
     app.use(express.json());
 
-    //attachAdminPanel(app);
+    attachAdminPanel(app);
 
     app.get("/health", (req, res) => {
         res.json({
