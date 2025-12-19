@@ -1,7 +1,8 @@
 import { connectToDatabase, disconnectFromDatabase } from "./config/db.js";
 import logger from "./utils/logger.js";
 import env from "./config/env.js";
-import { createBot, setupBotCommands, startPolling, startWebhook } from "./bot/setup.js";
+import { createBot, startPolling, startWebhook } from "./bot/setup.js";
+import { setupBotCommands } from "./bot/commands.js";
 import startAdminServer from "./dashboard/server.js";
 
 const bootstrap = async () => {
@@ -11,53 +12,75 @@ const bootstrap = async () => {
     await connectToDatabase();
 
     const bot = createBot();
-    let adminServer = null;
 
     await setupBotCommands(bot);
 
-    if (env.webhookDomain) {
-      await startWebhook(bot);
-    } else {
-      await startPolling(bot);
-    }
+    let server = null;
 
-    const gracefulShutdown = async () => {
-      logger.info("Received shutdown signal, stopping bot...");
+    const stopHandler = async (signal) => {
+      logger.info(`Received ${signal}, stopping application...`);
 
       try {
-        bot.stop();
-        await disconnectFromDatabase();
-        if (adminServer) {
-          adminServer.close(() => logger.info("Admin panel server stopped"));
+        if (env.webhookDomain) {
+        } else {
+          await bot.stop();
         }
-        logger.info("Bot stopped gracefully");
+
+        if (server) {
+          await new Promise((resolve, reject) => {
+            server.close((err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          logger.info("Server stopped");
+        }
+
+        await disconnectFromDatabase();
+        logger.info("Application stopped gracefully");
         process.exit(0);
       } catch (error) {
-        logger.error({ error }, "Error during shutdown");
+        logger.error({ error }, "Error during graceful shutdown");
         process.exit(1);
       }
     };
 
-    process.on("SIGTERM", gracefulShutdown);
-    process.on("SIGINT", gracefulShutdown);
+    process.once("SIGINT", () => stopHandler("SIGINT"));
+    process.once("SIGTERM", () => stopHandler("SIGTERM"));
 
-    process.on("uncaughtException", (error) => {
-      logger.error({ error }, "Uncaught Exception");
-      setTimeout(() => process.exit(1), 1000);
-    });
+    if (env.webhookDomain) {
+      server = await startWebhook(bot);
+    } else {
+      server = await startAdminServer();
 
-    process.on("unhandledRejection", (reason, promise) => {
-      logger.error({ reason, promise }, "Unhandled Rejection");
-    });
-  } catch (error) {
-    logger.error({ error }, "❌ Fatal error during bootstrap");
-
-    try {
-      await disconnectFromDatabase();
-    } catch (disconnectError) {
-      logger.error({ error: disconnectError }, "Failed to disconnect from database");
+      logger.info("Starting polling...");
+      await bot.start({
+        drop_pending_updates: env.isProduction,
+        allowed_updates: ["message", "callback_query", "inline_query"],
+        onStart: (botInfo) => {
+          logger.info(`🤖 Bot @${botInfo.username} started successfully`);
+          if (env.botAdminId && env.isProduction) {
+            bot.api.sendMessage(
+              env.botAdminId,
+              `✅ Бот @${botInfo.username} запущен в режиме polling`
+            ).catch(err => logger.warn("Failed to send startup message to admin"));
+          }
+        }
+      });
     }
 
+    if (!env.webhookDomain) {
+      if (server) {
+        server.close();
+      }
+      await disconnectFromDatabase();
+      logger.info("Cleanup finished");
+      process.exit(0);
+    }
+
+  } catch (error) {
+    logger.error({ error }, "❌ Fatal error during bootstrap");
+    try { await disconnectFromDatabase(); } catch (e) { }
     process.exit(1);
   }
 };

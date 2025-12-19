@@ -1,6 +1,5 @@
-import { Bot, GrammyError, HttpError } from "grammy";
+import { Bot } from "grammy";
 import { conversations, createConversation } from "@grammyjs/conversations";
-import { connectToDatabase, disconnectFromDatabase } from "../config/db.js";
 import setupSession from "./middlewares/session.js";
 import logger from "../utils/logger.js";
 import env from "../config/env.js";
@@ -8,28 +7,8 @@ import userContext from "./middlewares/userContext.js";
 import rootComposer from "./composers/root.js";
 import { setupBotErrorHandling } from "./handlers/errorHandler.js";
 import { createPoolConversation } from "./conversations/createPoolConversation.js";
-import { attachAdminPanel } from "../dashboard/panel.js";
-
-let webhookServer = null;
-
-const setupBotCommands = async (bot) => {
-    const commands = [
-        { command: "new", description: "➕ Создать сбор" },
-        { command: "pools", description: "📋 Мои сборы" },
-        { command: "help", description: "❓ Помощь" }
-    ];
-
-    try {
-        await bot.api.setMyCommands(commands);
-        logger.info("✅ Bot commands updated successfully");
-    } catch (error) {
-        logger.warn({ error }, "❌ Failed to set bot commands");
-
-        if (error instanceof GrammyError && error.error_code === 401) {
-            logger.error("Invalid bot token. Please check BOT_TOKEN in .env file");
-        }
-    }
-};
+import { createApp } from "../server/app.js";
+import { webhookCallback } from "grammy";
 
 const initializeMiddlewares = (bot) => {
     bot.use(setupSession());
@@ -62,7 +41,6 @@ export const startPolling = async (bot) => {
                 ).catch(err => logger.warn("Failed to send startup message to admin"));
             }
         },
-
         allowed_updates: ["message", "callback_query", "inline_query"],
         drop_pending_updates: env.isProduction,
         limit: 100,
@@ -81,36 +59,13 @@ export const startWebhook = async (bot) => {
         secret_token: env.webhookSecret,
     });
 
-    const { default: express } = await import("express");
-    const { default: helmet } = await import("helmet");
-    const { webhookCallback } = await import("grammy");
-
-    const app = express();
-
-    app.use(helmet());
-    app.use(express.json());
-
-    attachAdminPanel(app);
-
-    app.get("/health", (req, res) => {
-        res.json({
-            status: "OK",
-            timestamp: new Date().toISOString(),
-            bot: botInfo.username,
-            environment: env.nodeEnv,
-        });
-    });
-
+    const app = createApp();
     app.post(`/webhook/${env.botToken}`, webhookCallback(bot, "express"));
-
-    app.use((req, res) => {
-        res.status(404).json({ error: "Not found" });
-    });
 
     const port = env.port || 3000;
     const host = env.host || "0.0.0.0";
 
-    webhookServer = app.listen(port, host, () => {
+    const webhookServer = app.listen(port, host, () => {
         logger.info(`Webhook server listening on ${host}:${port}`);
         logger.info(`🤖 Bot @${botInfo.username} started successfully`);
 
@@ -121,23 +76,6 @@ export const startWebhook = async (bot) => {
             ).catch(err => logger.warn("Failed to send startup message to admin"));
         }
     });
-
-    const gracefulShutdown = () => {
-        logger.info("Received shutdown signal, closing webhook server...");
-        webhookServer.close(async () => {
-            await disconnectFromDatabase();
-            logger.info("Webhook server closed");
-            process.exit(0);
-        });
-
-        setTimeout(() => {
-            logger.error("Could not close connections in time, forcefully shutting down");
-            process.exit(1);
-        }, 10000);
-    };
-
-    process.on("SIGTERM", gracefulShutdown);
-    process.on("SIGINT", gracefulShutdown);
 
     return webhookServer;
 };
@@ -150,5 +88,3 @@ export const createBot = () => {
 
     return bot;
 };
-
-export { setupBotCommands };

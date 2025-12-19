@@ -1,6 +1,6 @@
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
-import { attachAdminPanel } from "./panel.js";
+import { createApp } from "../server/app.js";
 
 export const startAdminServer = async () => {
   if (!env.adminEnabled) {
@@ -8,36 +8,7 @@ export const startAdminServer = async () => {
     return null;
   }
 
-  const { default: express } = await import("express");
-  const { default: helmet } = await import("helmet");
-
-  const app = express();
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
-          styleSrc: ["'self'", "https://fonts.googleapis.com"],
-          fontSrc: ["'self'", "https://fonts.gstatic.com"],
-          imgSrc: ["'self'", "data:"],
-          connectSrc: ["'self'"],
-        },
-      },
-    })
-  );
-  app.use(express.json());
-
-  app.get("/health", (req, res) => {
-    res.json({
-      status: "OK",
-      admin: true,
-      environment: env.nodeEnv,
-      timestamp: new Date().toISOString()
-    });
-  });
-
-  attachAdminPanel(app);
+  const app = createApp();
 
   app.get("/", (req, res) => res.redirect("/dashboard"));
   app.get("/admin", (req, res) => res.redirect("/dashboard"));
