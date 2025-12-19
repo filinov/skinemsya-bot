@@ -1,4 +1,4 @@
-import { desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import getDb, { pools, poolParticipants, users } from "../config/db.js";
 import { getPoolById, setPoolClosed } from "../services/poolService.js";
 
@@ -8,62 +8,42 @@ const toNumber = (value) => {
 };
 
 const countRows = (query) => toNumber(query?.count ?? query?.value ?? 0);
-const sumRows = (query) => toNumber(query?.sum ?? query?.value ?? 0);
 
 export const getUsageStats = () => {
   const db = getDb();
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
+  // Users Stats
   const usersTotal = countRows(db.select({ count: sql`count(*)`.as("count") }).from(users).get());
   const usersActive24h = countRows(
     db.select({ count: sql`count(*)`.as("count") }).from(users).where(gte(users.lastSeenAt, since24h)).get()
   );
 
+  // Pools Stats
   const poolsTotal = countRows(db.select({ count: sql`count(*)`.as("count") }).from(pools).get());
   const poolsOpen = countRows(db.select({ count: sql`count(*)`.as("count") }).from(pools).where(eq(pools.isClosed, 0)).get());
   const poolsClosed = countRows(
     db.select({ count: sql`count(*)`.as("count") }).from(pools).where(eq(pools.isClosed, 1)).get()
   );
 
+  // New pools in last 24h
+  const poolsNew24h = countRows(
+    db.select({ count: sql`count(*)`.as("count") }).from(pools).where(gte(pools.createdAt, since24h)).get()
+  );
+
+  // Platform Interactions (Participants)
   const participantsTotal = countRows(db.select({ count: sql`count(*)`.as("count") }).from(poolParticipants).get());
-  const participantsConfirmed = countRows(
+
+  const transactionsTotal = countRows(
     db.select({ count: sql`count(*)`.as("count") }).from(poolParticipants).where(eq(poolParticipants.status, "confirmed")).get()
   );
-  const participantsMarked = countRows(
-    db.select({ count: sql`count(*)`.as("count") }).from(poolParticipants).where(eq(poolParticipants.status, "marked_paid")).get()
-  );
 
-  const paidTotal = sumRows(
-    db
-      .select({ sum: sql`COALESCE(sum(${poolParticipants.paidAmount}), 0)`.as("sum") })
+  const transactions24h = countRows(
+    db.select({ count: sql`count(*)`.as("count") })
       .from(poolParticipants)
+      .where(and(eq(poolParticipants.status, "confirmed"), gte(poolParticipants.confirmedAt, since24h)))
       .get()
   );
-
-  const expectedTotal = sumRows(
-    db
-      .select({ sum: sql`COALESCE(sum(${poolParticipants.expectedAmount}), 0)`.as("sum") })
-      .from(poolParticipants)
-      .get()
-  );
-
-  const targetTotal = sumRows(
-    db
-      .select({
-        sum: sql`
-          COALESCE(sum(
-            CASE 
-              WHEN ${pools.amountType} = 'per_person' THEN ${pools.perPersonAmount} * ${pools.expectedParticipantsCount}
-              ELSE ${pools.totalAmount}
-            END
-          ), 0)
-        `.as("sum")
-      })
-      .from(pools)
-      .get()
-  );
-
-  const completionPercent = targetTotal > 0 ? Math.min(100, Math.round((paidTotal / targetTotal) * 100)) : 0;
 
   return {
     users: {
@@ -73,18 +53,13 @@ export const getUsageStats = () => {
     pools: {
       total: poolsTotal,
       open: poolsOpen,
-      closed: poolsClosed
+      closed: poolsClosed,
+      new24h: poolsNew24h
     },
-    participants: {
-      total: participantsTotal,
-      confirmed: participantsConfirmed,
-      marked: participantsMarked
-    },
-    money: {
-      paidTotal,
-      expectedTotal,
-      targetTotal,
-      completionPercent
+    activity: {
+      participantsTotal,
+      transactionsTotal,
+      transactions24h
     },
     lastUpdated: new Date().toISOString()
   };
@@ -98,11 +73,6 @@ export const getRecentPools = (limit = 8) => {
       title: pools.title,
       ownerId: pools.ownerId,
       isClosed: pools.isClosed,
-      amountType: pools.amountType,
-      totalAmount: pools.totalAmount,
-      perPersonAmount: pools.perPersonAmount,
-      expectedParticipantsCount: pools.expectedParticipantsCount,
-      currency: pools.currency,
       createdAt: pools.createdAt
     })
     .from(pools)
@@ -163,19 +133,6 @@ const fillCounts = (buckets, timestamps) => {
   return buckets;
 };
 
-const fillSums = (buckets, entries) => {
-  const map = new Map(buckets.map((b) => [b.key, b]));
-  entries.forEach(({ ts, amount }) => {
-    if (!ts || amount == null) return;
-    const date = new Date(ts);
-    date.setHours(0, 0, 0, 0);
-    const key = date.toISOString().slice(0, 10);
-    const bucket = map.get(key);
-    if (bucket) bucket.value += Number(amount) || 0;
-  });
-  return buckets;
-};
-
 export const getTimelineStats = (days = 14) => {
   const db = getDb();
   const from = new Date();
@@ -194,29 +151,20 @@ export const getTimelineStats = (days = 14) => {
     .where(gte(users.createdAt, from))
     .all();
 
-  const paidRows = db
-    .select({
-      paidAmount: poolParticipants.paidAmount,
-      status: poolParticipants.status,
-      confirmedAt: poolParticipants.confirmedAt,
-      markedAt: poolParticipants.markedAt,
-      createdAt: poolParticipants.createdAt
-    })
-    .from(poolParticipants)
-    .where(inArray(poolParticipants.status, ["confirmed", "marked_paid"]))
+  const activeRows = db
+    .select({ lastSeenAt: users.lastSeenAt })
+    .from(users)
+    .where(gte(users.lastSeenAt, from))
     .all();
 
   const poolBuckets = fillCounts(buildTimelineBuckets(days), poolsRows.map((r) => r.createdAt));
   const userBuckets = fillCounts(buildTimelineBuckets(days), userRows.map((r) => r.createdAt));
-  const paidBuckets = fillSums(
-    buildTimelineBuckets(days),
-    paidRows.map((row) => ({ ts: row.confirmedAt || row.markedAt || row.createdAt, amount: row.paidAmount }))
-  );
+  const activeBuckets = fillCounts(buildTimelineBuckets(days), activeRows.map((r) => r.lastSeenAt));
 
   return {
     labels: poolBuckets.map((b) => b.label),
     pools: poolBuckets.map((b) => b.value),
     users: userBuckets.map((b) => b.value),
-    paid: paidBuckets.map((b) => Number(b.value.toFixed(2)))
+    active: activeBuckets.map((b) => b.value)
   };
 };

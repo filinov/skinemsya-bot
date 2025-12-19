@@ -1,8 +1,3 @@
-// Utility functions
-const formatAmount = (amount, currency = 'RUB') => {
-    return new Intl.NumberFormat('ru-RU', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount || 0);
-};
-
 const formatDate = (ts) => {
     if (!ts) return '—';
     return new Date(ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -31,15 +26,13 @@ const render = {
         document.getElementById('stat-users-total').textContent = data.users.total;
         document.getElementById('stat-users-active').textContent = `Active 24h: ${data.users.active24h}`;
 
-        document.getElementById('stat-pools-open').textContent = data.pools.open;
-        document.getElementById('stat-pools-closed').textContent = `Closed: ${data.pools.closed}`;
+        document.getElementById('stat-pools-total').textContent = data.pools.total;
+        document.getElementById('stat-pools-new').textContent = `New 24h: ${data.pools.new24h}`;
 
-        document.getElementById('stat-money-paid').textContent = formatAmount(data.money.paidTotal);
-        document.getElementById('stat-money-percent').textContent = `${data.money.completionPercent}%`;
-        document.getElementById('stat-money-progress').style.width = `${data.money.completionPercent}%`;
+        document.getElementById('stat-activity-transactions').textContent = data.activity.transactionsTotal;
+        document.getElementById('stat-activity-24h').textContent = `24h: ${data.activity.transactions24h}`;
 
-        document.getElementById('stat-participants-confirmed').textContent = data.participants.confirmed;
-        document.getElementById('stat-participants-marked').textContent = `Verify: ${data.participants.marked}`;
+        document.getElementById('stat-participants-total').textContent = data.activity.participantsTotal;
 
         document.getElementById('lastUpdated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
     },
@@ -47,15 +40,11 @@ const render = {
     pools(list) {
         const tbody = document.getElementById('poolsTableBody');
         if (!list.length) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; opacity:0.5;">Нет данных</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; opacity:0.5;">Нет данных</td></tr>`;
             return;
         }
 
         tbody.innerHTML = list.map(pool => {
-            const amount = pool.amountType === 'per_person'
-                ? `${formatAmount(pool.perPersonAmount)} / чел`
-                : formatAmount(pool.totalAmount);
-
             const statusClass = pool.isClosed ? 'chip--danger' : 'chip--success';
             const statusText = pool.isClosed ? 'Closed' : 'Open';
             const btnText = pool.isClosed ? 'Открыть' : 'Закрыть';
@@ -63,8 +52,7 @@ const render = {
             return `
         <tr>
           <td style="font-weight:600">${pool.title}</td>
-          <td style="color: var(--text-muted); font-size:12px">${pool.amountType}</td>
-          <td>${amount}</td>
+          <td style="color: var(--text-muted); font-size:12px">${formatDate(pool.createdAt)}</td>
           <td><span class="chip ${statusClass}">${statusText}</span></td>
           <td>
             <button class="btn" onclick="app.togglePool('${pool.id}')">${btnText}</button>
@@ -91,29 +79,29 @@ const render = {
     },
 
     charts(data) {
-        // Activity Chart
-        const ctxActivity = document.getElementById('chartActivity').getContext('2d');
-        if (state.charts.activity) state.charts.activity.destroy();
+        // Users Chart (Retention/Growth)
+        const ctxUsers = document.getElementById('chartUsers').getContext('2d');
+        if (state.charts.users) state.charts.users.destroy();
 
-        state.charts.activity = new Chart(ctxActivity, {
+        state.charts.users = new Chart(ctxUsers, {
             type: 'line',
             data: {
                 labels: data.labels,
                 datasets: [
                     {
-                        label: 'Сборы',
-                        data: data.pools,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    },
-                    {
-                        label: 'Пользователи',
+                        label: 'Total Users',
                         data: data.users,
-                        borderColor: '#10b981',
+                        borderColor: '#3b82f6',
                         backgroundColor: 'transparent',
                         tension: 0.4
+                    },
+                    {
+                        label: 'Active Users (DAU)',
+                        data: data.active,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true
                     }
                 ]
             },
@@ -127,17 +115,17 @@ const render = {
             }
         });
 
-        // Finance Chart
-        const ctxFinance = document.getElementById('chartFinance').getContext('2d');
-        if (state.charts.finance) state.charts.finance.destroy();
+        // Pools Chart (Creation Volume)
+        const ctxPools = document.getElementById('chartPools').getContext('2d');
+        if (state.charts.pools) state.charts.pools.destroy();
 
-        state.charts.finance = new Chart(ctxFinance, {
+        state.charts.pools = new Chart(ctxPools, {
             type: 'bar',
             data: {
                 labels: data.labels,
                 datasets: [{
-                    label: 'Оплаты',
-                    data: data.paid,
+                    label: 'New Pools',
+                    data: data.pools,
                     backgroundColor: '#8b5cf6',
                     borderRadius: 4
                 }]
@@ -175,15 +163,14 @@ const app = {
 
         } catch (e) {
             console.error('Failed to load data', e);
-            // Optional: Show toast error
         }
     },
 
     async togglePool(id) {
-        if (!confirm('Are you sure you want to change pool status?')) return;
+        if (!confirm('Change pool status?')) return;
         try {
             await api.post(`/admin/api/pools/${id}/toggle`);
-            await this.refresh(); // Reload to show updated state
+            await this.refresh();
         } catch (e) {
             alert('Failed to toggle pool');
         }
