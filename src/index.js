@@ -17,32 +17,30 @@ const bootstrap = async () => {
 
     if (env.enableWebhook) {
       await startWebhook(bot);
+      adminServer = await startAdminServer();
     } else {
       await startPolling(bot);
-      adminServer = await startAdminServer();
     }
 
-    if (!env.enableWebhook) {
-      const gracefulShutdown = async () => {
-        logger.info("Received shutdown signal, stopping bot...");
+    const gracefulShutdown = async () => {
+      logger.info("Received shutdown signal, stopping bot...");
 
-        try {
-          bot.stop();
-          await disconnectFromDatabase();
-          if (adminServer) {
-            adminServer.close(() => logger.info("Admin panel server stopped"));
-          }
-          logger.info("Bot stopped gracefully");
-          process.exit(0);
-        } catch (error) {
-          logger.error({ error }, "Error during shutdown");
-          process.exit(1);
+      try {
+        bot.stop();
+        await disconnectFromDatabase();
+        if (adminServer) {
+          adminServer.close(() => logger.info("Admin panel server stopped"));
         }
-      };
+        logger.info("Bot stopped gracefully");
+        process.exit(0);
+      } catch (error) {
+        logger.error({ error }, "Error during shutdown");
+        process.exit(1);
+      }
+    };
 
-      process.on("SIGTERM", gracefulShutdown);
-      process.on("SIGINT", gracefulShutdown);
-    }
+    process.on("SIGTERM", gracefulShutdown);
+    process.on("SIGINT", gracefulShutdown);
 
     process.on("uncaughtException", (error) => {
       logger.error({ error }, "Uncaught Exception");
