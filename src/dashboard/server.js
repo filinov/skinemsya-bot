@@ -39,6 +39,9 @@ export const startAdminServer = async () => {
 
   attachAdminPanel(app);
 
+  app.get("/", (req, res) => res.redirect("/dashboard"));
+  app.get("/admin", (req, res) => res.redirect("/dashboard"));
+
   app.use((req, res) => {
     res.status(404).json({ error: "Not found" });
   });

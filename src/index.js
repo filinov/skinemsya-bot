@@ -20,6 +20,7 @@ const bootstrap = async () => {
       adminServer = await startAdminServer();
     } else {
       await startPolling(bot);
+      adminServer = await startAdminServer();
     }
 
     const gracefulShutdown = async () => {
