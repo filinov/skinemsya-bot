@@ -172,13 +172,36 @@ const askParticipants = async (conversation, ctx, knownParticipants, owner) => {
   }
 };
 
-const askExpectedCount = async (conversation, ctx) => {
-  await ctx.reply("👥 <b>Сколько участников планируешь пригласить?</b> Отправь число, сумма поделиться между участниками.", { parse_mode: "HTML" });
+const askExpectedCount = async (conversation, ctx, minCount = 0) => {
+  let keyboard;
+  if (minCount > 0) {
+    keyboard = new InlineKeyboard().text(`Оставить ${minCount}`, `use_min:${minCount}`);
+  }
+
+  await ctx.reply(
+    "👥 <b>Сколько участников планируешь пригласить?</b>\nОтправь число, сумма поделится между участниками.",
+    { parse_mode: "HTML", reply_markup: keyboard }
+  );
+
   while (true) {
-    const { message } = await conversation.waitFor("message:text");
+    const incoming = await conversation.wait();
+    const { message, callbackQuery } = incoming;
+
+    if (callbackQuery?.data?.startsWith("use_min:")) {
+      await ctx.api.answerCallbackQuery(callbackQuery.id);
+      return minCount;
+    }
+
+    if (!message?.text) continue;
+
     const value = Number(message.text.trim());
     if (!Number.isNaN(value) && value > 0) {
-      return Math.round(value);
+      const rounded = Math.round(value);
+      if (rounded < minCount) {
+        await ctx.reply(`⚠️ Ты уже выбрал ${minCount} участников. Число должно быть не меньше ${minCount}.`, { parse_mode: "HTML" });
+        continue;
+      }
+      return rounded;
     }
     await ctx.reply("⚠️ Нужно указать целое число больше нуля. Попробуй еще раз.", { parse_mode: "HTML" });
   }
@@ -212,10 +235,11 @@ export const createPoolConversation = async (conversation, ctx) => {
   const paymentDetails = await askPaymentDetails(conversation, ctx, hints);
   const knownParticipants = await getKnownParticipants(owner.id);
   const selectedParticipants = await askParticipants(conversation, ctx, knownParticipants, owner);
-  const expectedParticipantsCount =
-    amountType === "total" && selectedParticipants.length === 0
-      ? await askExpectedCount(conversation, ctx)
-      : selectedParticipants.length || 1;
+
+  let expectedParticipantsCount = selectedParticipants.length || 1;
+  if (amountType === "total") {
+    expectedParticipantsCount = await askExpectedCount(conversation, ctx, selectedParticipants.length);
+  }
 
   const shareText =
     amountType === "per_person"
