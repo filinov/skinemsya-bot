@@ -8,8 +8,8 @@ import userContext from "./middlewares/userContext.js";
 import rootComposer from "./composers/root.js";
 import { setupBotErrorHandling } from "./handlers/errorHandler.js";
 import { createPoolConversation } from "./conversations/createPoolConversation.js";
-import { attachAdminPanel } from "../dashboard/panel.js";
-import startAdminServer from "../dashboard/server.js";
+// import { attachAdminPanel } from "../dashboard/panel.js";
+// import startAdminServer from "../dashboard/server.js";
 
 let webhookServer = null;
 

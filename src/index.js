@@ -17,10 +17,10 @@ const bootstrap = async () => {
 
     if (env.enableWebhook) {
       await startWebhook(bot);
-      adminServer = await startAdminServer();
+      // adminServer = await startAdminServer();
     } else {
       await startPolling(bot);
-      adminServer = await startAdminServer();
+      // adminServer = await startAdminServer();
     }
 
     const gracefulShutdown = async () => {
