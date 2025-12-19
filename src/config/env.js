@@ -29,7 +29,7 @@ const env = {
   logFile: process.env.LOG_FILE,
 
   // Вебхуки (для продакшена)
-  webhookDomain: `https://${process.env.DOMAIN}`,
+  webhookDomain: `https://skinemsya.bothost.ru`,
 
   // Настройки приложения
   port: parseIntSafe(process.env.PORT, 3000),
