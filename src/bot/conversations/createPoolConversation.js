@@ -1,8 +1,8 @@
 import { InlineKeyboard } from "grammy";
-import { createPool, ensureParticipant, getKnownParticipants, getOwnerPoolHints } from "../services/poolService.js";
-import { upsertUserFromTelegram, getDisplayName } from "../services/userService.js";
-import { escapeHtml, formatAmount, formatPaymentDetails } from "../utils/text.js";
-import logger from "../utils/logger.js";
+import { createPool, ensureParticipant, getKnownParticipants, getOwnerPoolHints } from "../../services/poolService.js";
+import { upsertUserFromTelegram, getDisplayName } from "../../services/userService.js";
+import { escapeHtml, formatAmount, formatPaymentDetails } from "../../utils/text.js";
+import logger from "../../utils/logger.js";
 import { sendMainMenu } from "../handlers/menuHandlers.js";
 import { renderOwnerPool } from "../handlers/ownerHandlers.js";
 import { buildParticipantPoolView } from "../presenters/poolPresenter.js";

@@ -1,7 +1,7 @@
 import { InlineKeyboard } from "grammy";
-import { getBotUsername } from "../utils/botInfo.js";
-import { getDisplayName } from "../services/userService.js";
-import { escapeHtml, formatAmount, formatPaymentDetails, poolHeadline } from "../utils/text.js";
+import { getBotUsername } from "../../utils/botInfo.js";
+import { getDisplayName } from "../../services/userService.js";
+import { escapeHtml, formatAmount, formatPaymentDetails, poolHeadline } from "../../utils/text.js";
 
 const participantStatusIcon = (participant) => {
   if (participant.status === "confirmed") return "✅";

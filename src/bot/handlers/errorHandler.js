@@ -1,5 +1,5 @@
 import { GrammyError, HttpError } from "grammy";
-import logger from "../utils/logger.js";
+import logger from "../../utils/logger.js";
 
 export function setupBotErrorHandling(bot) {
   bot.catch((err) => {

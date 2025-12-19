@@ -1,4 +1,4 @@
-import { upsertUserFromTelegram } from "../services/userService.js";
+import { upsertUserFromTelegram } from "../../services/userService.js";
 
 export default async (ctx, next) => {
   const state = (ctx.state ??= {});

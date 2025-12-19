@@ -1,7 +1,7 @@
 import { session } from "grammy";
 import { eq } from "drizzle-orm";
-import getDb, { sessions } from "../config/db.js";
-import logger from "../utils/logger.js";
+import getDb, { sessions } from "../../config/db.js";
+import logger from "../../utils/logger.js";
 
 class DrizzleSessionStorage {
   async read(key) {
