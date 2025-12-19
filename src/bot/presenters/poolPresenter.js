@@ -65,8 +65,13 @@ export const buildOwnerPoolView = async (pool, ctx) => {
 
   const statusText = pool.isClosed ? "⛔️ Сбор закрыт. Новые участники не смогут присоединиться." : "";
 
+  let participantsHeader = "👥 Участники:";
+  if (pool.amountType === "total" && pool.expectedParticipantsCount > 0) {
+    participantsHeader = `👥 Участники (${pool.participants.length} из ${pool.expectedParticipantsCount}):`;
+  }
+
   return {
-    text: `${poolHeadline(pool)}\n\n💰 Собрано: <b>${formatAmount(collectedAmount, pool.currency)}</b>\n\n👥 Участники:\n${participantsText}\n\n${statusText}`,
+    text: `${poolHeadline(pool)}\n\n💰 Собрано: <b>${formatAmount(collectedAmount, pool.currency)}</b>\n\n${participantsHeader}\n${participantsText}\n\n${statusText}`,
     shareUrl
   };
 };

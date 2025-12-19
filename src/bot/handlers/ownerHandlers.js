@@ -40,7 +40,14 @@ export const renderOwnerPool = async (ctx, pool) => {
   const keyboard = new InlineKeyboard();
 
   if (!pool.isClosed) {
-    keyboard.url("📨 Пригласить участников", shareUrl).row();
+    const isFull =
+      pool.amountType === "total" &&
+      pool.expectedParticipantsCount > 0 &&
+      pool.participants.length >= pool.expectedParticipantsCount;
+
+    if (!isFull) {
+      keyboard.url("📨 Пригласить участников", shareUrl).row();
+    }
     keyboard.text("✍️ Отметить взнос", `pmenu:${encodeInlineId(pool.id)}:1`).row();
   }
 
@@ -90,10 +97,10 @@ const buildPaymentMenu = (pool, page = 1, owner) => {
 
   const lines = items.length
     ? items.map((p, idx) => {
-        const position = start + idx + 1;
-        const icon = p.status === "confirmed" ? "✅" : p.status === "marked_paid" ? "⏳" : "❌";
-        return `${position}. ${icon} <b>${escapeHtml(p.displayName)}</b>`;
-      })
+      const position = start + idx + 1;
+      const icon = p.status === "confirmed" ? "✅" : p.status === "marked_paid" ? "⏳" : "❌";
+      return `${position}. ${icon} <b>${escapeHtml(p.displayName)}</b>`;
+    })
     : ["Пока нет участников. Отправь ссылку, чтобы они присоединились."];
 
   const keyboard = new InlineKeyboard();

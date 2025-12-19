@@ -53,7 +53,7 @@ export const createPool = async ({
   expectedParticipantsCount = 1
 }) => {
   const db = getDb();
-  const participantCount = participants.length > 0 ? participants.length : expectedParticipantsCount;
+  const participantCount = Math.max(participants.length, expectedParticipantsCount);
   const shareAmount = calculateShareAmount({
     amountType,
     totalAmount,
