@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header__content">
+        <h1 class="header__title">Dashboard</h1>
+        <div class="header__status" id="lastUpdated">loading...</div>
+      </div>
+      <button class="btn btn--icon" onclick="app.refresh()" aria-label="Refresh"> Refresh </button>
+    </header>
+
+    <main class="dashboard">
+      <!-- Stats Grid -->
+      <section class="grid grid--stats">
+        <div class="card stat-card">
+          <div class="stat-card__title">Пользователи</div>
+          <div class="stat-card__value" id="stat-users-total">-</div>
+          <div class="stat-card__trend" id="stat-users-active">Active: -</div>
+        </div>
+        <div class="card stat-card stat-card--accent">
+          <div class="stat-card__title">Сборы</div>
+          <div class="stat-card__value" id="stat-pools-open">-</div>
+          <div class="stat-card__trend" id="stat-pools-closed">Closed: -</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-card__title">Касса</div>
+          <div class="stat-card__value" id="stat-money-paid">-</div>
+          <div class="stat-card__trend">
+            <div class="progress-bar">
+              <div class="progress-bar__fill" id="stat-money-progress" style="width: 0%"></div>
+            </div>
+            <span id="stat-money-percent">0%</span>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-card__title">Подтверждено</div>
+          <div class="stat-card__value" id="stat-participants-confirmed">-</div>
+          <div class="stat-card__trend" id="stat-participants-marked">Marked: -</div>
+        </div>
+      </section>
+
+      <!-- Charts Section -->
+      <section class="grid grid--charts">
+        <div class="card chart-card">
+          <div class="card__header">
+            <h3>Активность (14 дней)</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="chartActivity"></canvas>
+          </div>
+        </div>
+        <div class="card chart-card">
+          <div class="card__header">
+            <h3>Финансы</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="chartFinance"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tables Section -->
+      <section class="grid grid--tables">
+        <!-- Recent Pools -->
+        <div class="card table-card">
+          <div class="card__header">
+            <h3>Последние сборы</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Название</th>
+                  <th>Тип</th>
+                  <th>Сумма</th>
+                  <th>Статус</th>
+                  <th>Действие</th>
+                </tr>
+              </thead>
+              <tbody id="poolsTableBody">
+                <!-- Dynamic Content -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Recent Users -->
+        <div class="card table-card">
+          <div class="card__header">
+            <h3>Новые пользователи</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Имя</th>
+                  <th>Username</th>
+                  <th>Активность</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <!-- Dynamic Content -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
