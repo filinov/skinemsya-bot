@@ -78,6 +78,7 @@ export const startWebhook = async (bot) => {
     await bot.api.setWebhook(webhookUrl, {
         allowed_updates: ["message", "callback_query"],
         drop_pending_updates: true,
+        secret_token: env.webhookSecret,
     });
 
     const { default: express } = await import("express");
