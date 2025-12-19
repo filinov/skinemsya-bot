@@ -60,7 +60,13 @@ export const startWebhook = async (bot) => {
     });
 
     const app = createApp();
-    app.post(`/webhook/${env.botToken}`, webhookCallback(bot, "express"));
+
+    app.post(`/webhook/${env.botToken}`, (req, res, next) => {
+        logger.info("🎯 Webhook route hit!");
+        // Explicitly handle the update
+        const handler = webhookCallback(bot, "express");
+        handler(req, res, next);
+    });
 
     const port = env.port || 3000;
     const host = env.host || "0.0.0.0";

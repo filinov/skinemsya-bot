@@ -11,17 +11,6 @@ import logger from "../utils/logger.js";
 export const createApp = () => {
     const app = express();
 
-    // Request logging middleware
-    app.use((req, res, next) => {
-        logger.info({
-            method: req.method,
-            url: req.url,
-            headers: req.headers,
-            body: req.body // Body might be empty here if processed later, but express.json() is below
-        }, "Incoming request");
-        next();
-    });
-
     app.use(
         helmet({
             contentSecurityPolicy: {
@@ -37,6 +26,17 @@ export const createApp = () => {
         })
     );
     app.use(express.json());
+
+    // Request logging middleware (after json parsing)
+    app.use((req, res, next) => {
+        logger.info({
+            method: req.method,
+            url: req.url,
+            // headers: req.headers, // headers can be verbose
+            body: req.body
+        }, "Incoming request");
+        next();
+    });
 
     app.get("/health", (req, res) => {
         res.json({
