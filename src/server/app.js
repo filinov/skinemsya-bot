@@ -3,6 +3,7 @@ import helmet from "helmet";
 import { attachAdminPanel } from "../dashboard/panel.js";
 import env from "../config/env.js";
 import logger from "../utils/logger.js";
+import cookieParser from "cookie-parser";
 
 /**
  * Creates and configures an Express application.
@@ -10,6 +11,8 @@ import logger from "../utils/logger.js";
  */
 export const createApp = () => {
     const app = express();
+
+    app.use(cookieParser());
 
     app.use(
         helmet({

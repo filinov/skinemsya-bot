@@ -16,6 +16,11 @@ export const attachAdminPanel = (app) => {
 
   app.use("/dashboard/api", apiRouter);
 
+  // Serve login page publicly
+  app.get("/dashboard/login", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "login.html"));
+  });
+
   const staticRouter = express.Router();
   staticRouter.use(requireAdminAuth);
   staticRouter.use(express.static(path.join(__dirname, "public")));

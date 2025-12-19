@@ -2,36 +2,60 @@ import express from "express";
 import logger from "../../utils/logger.js";
 import { getRecentPools, getRecentUsers, getTimelineStats, getUsageStats, togglePoolState } from "../statsService.js";
 import env from "../../config/env.js";
+import crypto from "crypto";
 
-const parseBasicAuth = (header) => {
-    if (!header || !header.startsWith("Basic ")) return null;
-    const base64 = header.replace("Basic ", "");
-    const decoded = Buffer.from(base64, "base64").toString();
-    const [username, password] = decoded.split(":");
-    if (!username || password === undefined) return null;
-    return { username, password };
-};
+// Simple in-memory session token (in production use Redis or signed cookies)
+// Since we have single admin, a simple token match is enough.
+const SESSION_COOKIE_NAME = "admin_session";
+// Generate a random session secret on startup
+const SESSION_SECRET = crypto.randomBytes(32).toString("hex");
 
 export const requireAdminAuth = (req, res, next) => {
     if (!env.adminEnabled) {
         return res.status(503).json({ error: "Admin panel is disabled" });
     }
-    if (!env.adminLogin || !env.adminPassword) {
-        logger.warn("Admin panel requested but credentials are not set");
-        return res.status(503).json({ error: "Admin credentials are not configured" });
+
+    const sessionToken = req.cookies[SESSION_COOKIE_NAME];
+
+    if (sessionToken === SESSION_SECRET) {
+        return next();
     }
 
-    const credentials = parseBasicAuth(req.headers.authorization);
-    if (!credentials || credentials.username !== env.adminLogin || credentials.password !== env.adminPassword) {
-        res.set("WWW-Authenticate", 'Basic realm="bot-admin"');
-        return res.status(401).json({ error: "Authentication required" });
+    // If it's an API request, return 401
+    if (req.originalUrl.startsWith("/dashboard/api")) {
+        return res.status(401).json({ error: "Unauthorized" });
     }
 
-    return next();
+    // Otherwise redirect to login page
+    return res.redirect("/dashboard/login");
 };
 
 const router = express.Router();
 router.use(express.json());
+
+// Auth routes
+router.post("/auth/login", (req, res) => {
+    const { login, password } = req.body;
+
+    if (login === env.adminLogin && password === env.adminPassword) {
+        res.cookie(SESSION_COOKIE_NAME, SESSION_SECRET, {
+            httpOnly: true,
+            secure: env.isProduction, // Secure in production
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+        return res.json({ ok: true });
+    }
+
+    logger.warn({ ip: req.ip }, "Failed login attempt");
+    return res.status(401).json({ ok: false, error: "Invalid credentials" });
+});
+
+router.post("/auth/logout", (req, res) => {
+    res.clearCookie(SESSION_COOKIE_NAME);
+    res.json({ ok: true });
+});
+
+// Protected routes middleware
 router.use(requireAdminAuth);
 
 // Get global stats
