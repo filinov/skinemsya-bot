@@ -9,11 +9,16 @@ const bootstrap = async () => {
   try {
     logger.info(`🚀 Starting bot in ${env.nodeEnv} mode`);
 
+    logger.info("Connecting to database...");
     await connectToDatabase();
+    logger.info("Database connected.");
 
     const bot = createBot();
 
+    // Setup commands
+    logger.info("Setting up bot commands...");
     await setupBotCommands(bot);
+    logger.info("Bot commands set.");
 
     let server = null;
 
