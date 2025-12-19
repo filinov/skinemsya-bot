@@ -91,7 +91,7 @@ export const connectToDatabase = async () => {
     sqlite = new Database(filePath || ":memory:");
     applyMigrations();
     db = drizzle(sqlite);
-    logger.info({ url: env.databaseUrl }, "✅ Connected to SQLite database");
+    logger.info("✅ Connected to SQLite database");
     return db;
   } catch (error) {
     logger.error({ err: error }, "❌ Error connecting to SQLite");
